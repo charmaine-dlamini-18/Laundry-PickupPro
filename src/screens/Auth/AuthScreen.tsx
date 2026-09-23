@@ -198,14 +198,18 @@ export default function AuthScreen({ navigation, route }: Props) {
 
     setRegLoading(true);
     try {
-      const user = await AuthServices.register({
-        role,
-        name: regName,
-        email: regEmail,
-        phone: regPhone,
-        password: regPassword,
-      });
-      signIn(role, user);
+      await AuthServices.register({
+  role,
+  name: regName,
+  email: regEmail,
+  phone: regPhone,
+  password: regPassword,
+});
+
+Alert.alert(
+  'Check your email',
+  'Your account has been created. Please confirm your email address before logging in.'
+);
     } catch (error) {
       Alert.alert(
         'Registration failed',
