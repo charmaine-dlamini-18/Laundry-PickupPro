@@ -104,6 +104,17 @@ export async function register({
   };
 }
 
+export async function resendConfirmationEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function forgotPassword(email: string): Promise<void> {
   if (!email.trim()) {
     throw new Error('Please enter your email address.');

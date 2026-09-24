@@ -26,7 +26,6 @@ import BookingHeader from '../../components/BookingHeader';
 import FancyAlert from '../../components/FancyAlert';
 import type { DriverStackParamList } from '../../navigation/DriverNavigator';
 import { useDriverOrders } from '../../context/DriverOrdersContext';
-import { useNotifications } from '../../context/NotificationsContext';
 import { useAuth } from '../../hooks/useAuth';
 
 const isWeb = Platform.OS === 'web';
@@ -52,7 +51,6 @@ export default function DeliveryDetailsScreen({
 }: Props) {
   const { order } = route.params;
   const { updateOrderStatus } = useDriverOrders();
-  const { pushNotification } = useNotifications();
   const { user } = useAuth();
 
   const [fontsLoaded] = useFonts({
@@ -82,20 +80,13 @@ export default function DeliveryDetailsScreen({
   const confirmDelivery = () => {
     setShowConfirm(false);
     updateOrderStatus(order.orderNumber, 'Completed');
-    pushNotification({
-      kind: 'order_delivered',
-      audience: 'customer',
-      recipientName: order.customer,
-      orderId: order.orderNumber,
-      title: 'Order Delivered',
-      message: `Your order ${order.orderNumber} has been delivered. Thanks for using Laundry Pickup Pro!`,
-    }).catch(() => undefined);
     setShowSuccess(true);
   };
 
   const openChat = () => {
     navigation.navigate('ChatScreen', {
-      orderId: order.orderNumber,
+      orderId: order.bookingReference ?? order.orderNumber,
+      orderLabel: order.orderNumber,
       contactName: order.customer,
       myRole: 'driver',
       myName: user?.name ?? 'Driver',

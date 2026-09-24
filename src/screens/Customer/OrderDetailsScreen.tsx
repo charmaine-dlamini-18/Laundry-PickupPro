@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -24,6 +25,8 @@ import {
 import BookingHeader from '../../components/BookingHeader';
 import { useOrders } from '../../context/OrdersContext';
 import { useAuth } from '../../hooks/useAuth';
+import { addCustomerReview } from '../../services/adminOrderServices';
+import { cancelCustomerBooking } from '../../services/bookingServices';
 import type { CustomerStackParamList } from '../../navigation/types';
 import type { OrderStatus } from '../../data/orders';
 import { isOrderActive, isOrderCancellable } from '../../data/orders';
@@ -123,6 +126,10 @@ export default function OrderDetailsScreen({ navigation, route }: Props) {
     Poppins_700Bold,
   });
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   if (!fontsLoaded) return null;
 
@@ -139,7 +146,8 @@ export default function OrderDetailsScreen({ navigation, route }: Props) {
   const handleChat = () => {
     if (!order.driver) return;
     navigation.navigate('Chat', {
-      orderId: order.id,
+      orderId: order.reference ?? order.id,
+      orderLabel: order.reference,
       contactName: order.driver,
       myRole: 'customer',
       myName: user?.name ?? 'Customer',
@@ -150,10 +158,45 @@ export default function OrderDetailsScreen({ navigation, route }: Props) {
     setShowCancelModal(true);
   };
 
-  const confirmCancel = () => {
+  const confirmCancel = async () => {
     setShowCancelModal(false);
-    updateOrderStatus(order.id, 'Cancelled');
-    Alert.alert('Order cancelled', `${order.reference} has been cancelled.`);
+    try {
+      await cancelCustomerBooking(order.reference);
+      updateOrderStatus(order.id, 'Cancelled');
+      Alert.alert('Order cancelled', `${order.reference} has been cancelled.`);
+    } catch (e) {
+      Alert.alert(
+        'Could not cancel',
+        e instanceof Error ? e.message : 'Please try again.'
+      );
+    }
+  };
+
+  const openReview = () => {
+    setReviewRating(0);
+    setReviewComment('');
+    setShowReviewModal(true);
+  };
+
+  const submitReview = async () => {
+    if (reviewRating < 1) return;
+    setReviewSubmitting(true);
+    try {
+      await addCustomerReview(
+        order.reference ?? '',
+        reviewRating,
+        reviewComment
+      );
+      setShowReviewModal(false);
+      Alert.alert('Thank you!', 'Your review for this order has been submitted.');
+    } catch (error) {
+      Alert.alert(
+        'Could not submit review',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   return (
@@ -315,6 +358,22 @@ export default function OrderDetailsScreen({ navigation, route }: Props) {
             </LinearGradient>
           </TouchableOpacity>
         )}
+        {order.status === 'Delivered' && (
+          <TouchableOpacity
+            style={styles.reviewButtonTouch}
+            activeOpacity={0.9}
+            onPress={openReview}
+          >
+            <LinearGradient
+              colors={['#E8960C', '#B97308']}
+              style={styles.reviewButton}
+            >
+              <View style={styles.shine} />
+              <MaterialCommunityIcons name="star-outline" size={18} color={WHITE} />
+              <Text style={styles.reviewButtonText}>Rate this Order</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Modal
@@ -356,6 +415,74 @@ export default function OrderDetailsScreen({ navigation, route }: Props) {
                   <View style={styles.cancelConfirmShine} />
                   <MaterialCommunityIcons name="close" size={16} color={WHITE} />
                   <Text style={styles.cancelConfirmText}>Cancel Order</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showReviewModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReviewModal(false)}
+      >
+        <View style={styles.reviewOverlay}>
+          <View style={styles.reviewCard}>
+            <View style={styles.reviewIconGlow}>
+              <View style={styles.reviewIconCircle}>
+                <MaterialCommunityIcons name="star-outline" size={32} color={AMBER} />
+              </View>
+            </View>
+            <Text style={styles.reviewTitle}>How was your experience?</Text>
+            <Text style={styles.reviewSubtitle}>
+              Rate your order to help us keep improving.
+            </Text>
+            <View style={styles.reviewStarsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  activeOpacity={0.7}
+                  onPress={() => setReviewRating(star)}
+                >
+                  <MaterialCommunityIcons
+                    name={star <= reviewRating ? 'star' : 'star-outline'}
+                    size={40}
+                    color={star <= reviewRating ? '#F5A623' : '#D4DBE3'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.reviewInput}
+              placeholder="Add a comment (optional)"
+              placeholderTextColor={TEXT_MUTED}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+              maxLength={280}
+            />
+            <View style={styles.reviewActions}>
+              <TouchableOpacity
+                style={styles.reviewCancelTouch}
+                activeOpacity={0.85}
+                onPress={() => setShowReviewModal(false)}
+              >
+                <View style={styles.reviewCancelButton}>
+                  <Text style={styles.reviewCancelText}>Skip</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.reviewSubmitTouch}
+                activeOpacity={0.85}
+                disabled={reviewRating < 1 || reviewSubmitting}
+                onPress={submitReview}
+              >
+                <LinearGradient colors={GRADIENT_VIBRANT} style={styles.reviewSubmitButton}>
+                  <Text style={styles.reviewSubmitText}>
+                    {reviewSubmitting ? 'Submitting…' : 'Submit'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -796,5 +923,147 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: WHITE,
     marginLeft: 6,
+  },
+  reviewButtonTouch: {
+    borderRadius: 18,
+    elevation: 3,
+    shadowColor: AMBER,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  reviewButtonText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+    color: WHITE,
+    marginLeft: 8,
+  },
+  reviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(18, 38, 58, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  reviewCard: {
+    backgroundColor: WHITE,
+    borderRadius: 28,
+    paddingHorizontal: 26,
+    paddingTop: 32,
+    paddingBottom: 24,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
+    elevation: 18,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+  },
+  reviewIconGlow: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(232, 150, 12, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  reviewIconCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: AMBER_TINT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 19,
+    color: TEXT_DARK,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  reviewSubtitle: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    lineHeight: 20,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  reviewInput: {
+    width: '100%',
+    minHeight: 72,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: TEXT_DARK,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+  },
+  reviewActions: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 10,
+  },
+  reviewCancelTouch: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    backgroundColor: '#F9FAFB',
+  },
+  reviewCancelButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 50,
+    borderRadius: 14,
+  },
+  reviewCancelText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+    color: TEXT_MUTED,
+  },
+  reviewSubmitTouch: {
+    flex: 1,
+    borderRadius: 14,
+    elevation: 6,
+    shadowColor: BLUE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  reviewSubmitButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 50,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  reviewSubmitText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+    color: WHITE,
   },
 });

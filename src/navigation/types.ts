@@ -4,6 +4,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { CustomerOrder } from '../data/orders';
+import type { ChatScreenParams } from '../components/ChatScreen';
 
 export type CustomerTabParamList = {
   Home: undefined;
@@ -20,12 +21,7 @@ export type CustomerStackParamList = {
   Addresses: undefined;
   Settings: undefined;
   Support: undefined;
-  Chat: {
-    orderId: string;
-    contactName: string;
-    myRole: 'customer' | 'driver';
-    myName: string;
-  };
+  Chat: ChatScreenParams;
 };
 
 export type CustomerTabNavigation = CompositeNavigationProp<

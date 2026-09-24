@@ -46,28 +46,24 @@ export function NotificationsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, role } = useAuth();
+  const { role } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
   const audience = audienceForRole(role);
-  const recipientName = user?.name ?? '';
+  const recipientName = '';
 
   const refresh = useCallback(async () => {
-    if (!audience || !recipientName.trim()) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
     try {
-      const records = await fetchNotifications(audience, recipientName);
+      const records = await fetchNotifications('customer', '');
       setNotifications(records);
     } catch {
       setNotifications([]);
     } finally {
       setLoading(false);
     }
-  }, [audience, recipientName]);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -91,7 +87,7 @@ export function NotificationsProvider({
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    if (!audience || !recipientName.trim()) return;
+    if (!audience) return;
     setNotifications((prev) =>
       prev.map((item) => ({ ...item, read: true }))
     );

@@ -68,6 +68,21 @@ const KIND_META: Record<
         color: BLUE,
         tint: BLUE_TINT,
     },
+    driver_assigned: {
+        icon: 'clipboard-check-outline',
+        color: BLUE,
+        tint: BLUE_TINT,
+    },
+    order_placed: {
+        icon: 'clipboard-check-outline',
+        color: BLUE,
+        tint: BLUE_TINT,
+    },
+    order_updated: {
+        icon: 'update',
+        color: BLUE,
+        tint: BLUE_TINT,
+    },
     new_message: {
         icon: 'message-text-outline',
         color: GREEN,
@@ -77,6 +92,11 @@ const KIND_META: Record<
         icon: 'check-circle-outline',
         color: GREEN,
         tint: GREEN_TINT,
+    },
+    info: {
+        icon: 'information-outline',
+        color: BLUE,
+        tint: BLUE_TINT,
     },
 };
 

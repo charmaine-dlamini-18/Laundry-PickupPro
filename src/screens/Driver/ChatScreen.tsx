@@ -57,25 +57,46 @@ export default function ChatScreen({ navigation }: Props) {
   );
 
   const query = searchText.trim().toLowerCase();
-  const conversations = myOrders
+  const byBooking = new Map<string, { order: typeof myOrders[number]; legs: typeof myOrders }>();
+  for (const order of myOrders) {
+    const key = order.bookingReference ?? order.orderNumber;
+    const existing = byBooking.get(key);
+    if (existing) {
+      existing.legs.push(order);
+    } else {
+      byBooking.set(key, { order, legs: [order] });
+    }
+  }
+
+  const conversations = Array.from(byBooking.values())
+    .map(({ order, legs }) => {
+      const key = order.bookingReference ?? order.orderNumber;
+      return {
+        key,
+        label: order.bookingReference ?? order.orderNumber,
+        customer: order.customer,
+        address: legs.map((l) => l.address).filter(Boolean).join(' · '),
+        messageKey: key,
+      };
+    })
     .filter(
-      (order) =>
+      (c) =>
         !query ||
-        order.customer.toLowerCase().includes(query) ||
-        order.orderNumber.toLowerCase().includes(query)
+        c.customer.toLowerCase().includes(query) ||
+        c.label.toLowerCase().includes(query)
     )
-    .map((order) => {
-      const orderMessages = allMessages[order.orderNumber] ?? [];
+    .map((c) => {
+      const orderMessages = allMessages[c.messageKey] ?? [];
       const lastMessage =
         orderMessages.length > 0
           ? orderMessages[orderMessages.length - 1]
           : null;
-      return { order, lastMessage };
+      return { ...c, lastMessage };
     });
 
-  const openConversation = (orderNumber: string, customerName: string) => {
+  const openConversation = (threadKey: string, customerName: string) => {
     navigation.navigate('ChatScreen', {
-      orderId: orderNumber,
+      orderId: threadKey,
       contactName: customerName,
       myRole: 'driver',
       myName: user?.name ?? 'Driver',
@@ -127,19 +148,17 @@ export default function ChatScreen({ navigation }: Props) {
             </Text>
           </View>
         ) : (
-          conversations.map(({ order, lastMessage }) => {
-            const initial = order.customer.charAt(0).toUpperCase();
+          conversations.map(({ key, label, customer, address, lastMessage }) => {
+            const initial = customer.charAt(0).toUpperCase();
             const preview = lastMessage
               ? `${lastMessage.senderRole === 'driver' ? 'You: ' : ''}${lastMessage.text}`
               : 'No messages yet — say hello!';
             return (
               <TouchableOpacity
-                key={order.id}
+                key={key}
                 style={styles.conversationCard}
                 activeOpacity={0.85}
-                onPress={() =>
-                  openConversation(order.orderNumber, order.customer)
-                }
+                onPress={() => openConversation(key, customer)}
               >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initial}</Text>
@@ -149,15 +168,15 @@ export default function ChatScreen({ navigation }: Props) {
                 <View style={styles.conversationBody}>
                   <View style={styles.conversationTopRow}>
                     <Text style={styles.customerName} numberOfLines={1}>
-                      {order.customer}
+                      {customer}
                     </Text>
-                    <Text style={styles.orderPill}>{order.orderNumber}</Text>
+                    <Text style={styles.orderPill}>{label}</Text>
                   </View>
                   <Text style={styles.preview} numberOfLines={1}>
                     {preview}
                   </Text>
                   <Text style={styles.orderMeta} numberOfLines={1}>
-                    {order.type} · {order.address}
+                    {address}
                   </Text>
                 </View>
 

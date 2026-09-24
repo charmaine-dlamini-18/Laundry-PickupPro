@@ -185,7 +185,8 @@ export default function TrackOrderScreen() {
   const chatDriver = () => {
     if (!order.driver) return;
     (navigation as unknown as NativeStackNavigationProp<any>).navigate('Chat', {
-      orderId: order.id,
+      orderId: order.reference ?? order.id,
+      orderLabel: order.reference,
       contactName: order.driver,
       myRole: 'customer',
       myName: user?.name ?? 'Customer',

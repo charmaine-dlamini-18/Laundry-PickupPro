@@ -23,6 +23,7 @@ import {
 import type { AdminStackParamList } from '../../navigation/AdminNavigator';
 import { useAuth } from '../../hooks/useAuth';
 import FancyAlert from '../../components/FancyAlert';
+import * as AuthServices from '../../services/AuthServices';
 import { isEmail, isMinLength, isRequired } from '../../utils/validation';
 
 type Props = NativeStackScreenProps<AdminStackParamList, 'Login'>;
@@ -39,23 +40,14 @@ const isWeb = Platform.OS === 'web';
 
 const GRADIENT_HEADER = [BLUE, PURPLE] as const;
 
-const displayName = (email: string) => {
-  const base = email.trim().split('@')[0] || 'Admin';
-  const capitalized = base
-    .replace(/[._-]+/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-  return capitalized || 'Admin';
-};
-
 export default function AdminLoginScreen({ navigation }: Props) {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loginError, setLoginError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [forgotVisible, setForgotVisible] = useState(false);
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -66,7 +58,7 @@ export default function AdminLoginScreen({ navigation }: Props) {
 
   if (!fontsLoaded) return null;
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const next: Record<string, string> = {};
     if (!isEmail(email)) next.email = 'Enter a valid admin email';
     if (!isRequired(password)) next.password = 'Enter your password';
@@ -74,14 +66,19 @@ export default function AdminLoginScreen({ navigation }: Props) {
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    signIn('admin', {
-      id: 'admin-1',
-      name: displayName(email),
-      email: email.trim(),
-      role: 'admin',
-    });
-
-    navigation.replace('Dashboard');
+    setLoggingIn(true);
+    setLoginError('');
+    try {
+      const user = await AuthServices.login({ role: 'admin', email, password });
+      signIn('admin', user);
+      navigation.replace('Dashboard');
+    } catch (error) {
+      setLoginError(
+        error instanceof Error ? error.message : 'Something went wrong.'
+      );
+    } finally {
+      setLoggingIn(false);
+    }
   };
 
   return (
@@ -157,15 +154,22 @@ export default function AdminLoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
+          {!!loginError && (
+            <Text style={styles.errorText}>{loginError}</Text>
+          )}
+
           <TouchableOpacity
             style={styles.loginButtonTouch}
             activeOpacity={0.9}
+            disabled={loggingIn}
             onPress={handleLogin}
           >
             <LinearGradient colors={GRADIENT_HEADER} style={styles.loginButton}>
               <View style={styles.shine} />
               <MaterialCommunityIcons name="login-variant" size={20} color={WHITE} />
-              <Text style={styles.loginButtonText}>Log in</Text>
+              <Text style={styles.loginButtonText}>
+                {loggingIn ? 'Logging in…' : 'Log in'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

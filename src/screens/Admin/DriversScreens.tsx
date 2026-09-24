@@ -25,6 +25,7 @@ import {
 import type { AdminStackParamList } from '../../navigation/AdminNavigator';
 import { useAdmin } from '../../context/AdminContext';
 import type { AdminDriver } from '../../context/AdminContext';
+import * as DriverServices from '../../services/driverServices';
 import FancyAlert from '../../components/FancyAlert';
 import { isEmail, isPhone, isRequired } from '../../utils/validation';
 
@@ -77,6 +78,7 @@ function joinedStamp(): string {
 type FormModalProps = {
   visible: boolean;
   driver: AdminDriver | null;
+  saving?: boolean;
   onClose: () => void;
   onSave: (draft: {
     name: string;
@@ -92,6 +94,7 @@ type FormModalProps = {
 function DriverFormModal({
   visible,
   driver,
+  saving,
   onClose,
   onSave,
 }: FormModalProps) {
@@ -280,10 +283,24 @@ function DriverFormModal({
             })}
           </View>
 
-          <TouchableOpacity style={styles.formSaveTouch} activeOpacity={0.9} onPress={handleSave}>
-            <LinearGradient colors={GRADIENT_VIBRANT} style={styles.formSave}>
+          <TouchableOpacity
+            style={styles.formSaveTouch}
+            activeOpacity={0.9}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <LinearGradient colors={GRADIENT_VIBRANT} style={[styles.formSave, saving && styles.formSaveDisabled]}>
+              <MaterialCommunityIcons
+                name={saving ? 'progress-clock' : 'content-save-outline'}
+                size={16}
+                color={WHITE}
+              />
               <Text style={styles.formSaveText}>
-                {driver ? 'Save Changes' : 'Add Driver'}
+                {saving
+                  ? 'Saving…'
+                  : driver
+                    ? 'Save Changes'
+                    : 'Add Driver'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -510,6 +527,11 @@ export default function DriversScreen({ navigation }: Props) {
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<AdminDriver | null>(null);
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<{
+    visible: boolean;
+    message: string;
+  }>({ visible: false, message: '' });
   const [success, setSuccess] = useState<{
     visible: boolean;
     title: string;
@@ -547,7 +569,7 @@ export default function DriversScreen({ navigation }: Props) {
     setFormVisible(true);
   };
 
-  const handleSave = (draft: {
+  const handleSave = async (draft: {
     name: string;
     email: string;
     password: string;
@@ -556,61 +578,108 @@ export default function DriversScreen({ navigation }: Props) {
     registration: string;
     area: ServiceArea;
   }) => {
-    if (formDriver) {
-      updateDriver(formDriver.id, {
-        name: draft.name,
-        email: draft.email,
-        password: draft.password,
-        phone: draft.phone,
-        vehicle: draft.vehicle,
-        registration: draft.registration,
-        area: draft.area,
-        initials: initialsFor(draft.name),
-      });
-      setFormVisible(false);
-      setSelectedDriver(null);
-      setSuccess({
+    setSaving(true);
+    try {
+      if (formDriver) {
+        await DriverServices.updateDriver(formDriver.id, {
+          name: draft.name,
+          email: draft.email,
+          password: draft.password,
+          phone: draft.phone,
+          vehicle: draft.vehicle,
+          registration: draft.registration,
+          area: draft.area,
+        });
+        updateDriver(formDriver.id, {
+          name: draft.name,
+          email: draft.email,
+          password: draft.password,
+          phone: draft.phone,
+          vehicle: draft.vehicle,
+          registration: draft.registration,
+          area: draft.area,
+          initials: initialsFor(draft.name),
+        });
+        setFormVisible(false);
+        setSelectedDriver(null);
+        setSuccess({
+          visible: true,
+          title: 'Driver updated',
+          message: `${draft.name}'s details have been updated.`,
+        });
+      } else {
+        const { id } = await DriverServices.createDriver({
+          name: draft.name,
+          email: draft.email,
+          password: draft.password,
+          phone: draft.phone,
+          vehicle: draft.vehicle,
+          registration: draft.registration,
+          area: draft.area,
+        });
+        const palette = AVATAR_PALETTE[drivers.length % AVATAR_PALETTE.length];
+        addDriver({
+          id,
+          initials: initialsFor(draft.name),
+          name: draft.name,
+          email: draft.email,
+          password: draft.password,
+          phone: draft.phone,
+          vehicle: draft.vehicle,
+          registration: draft.registration,
+          area: draft.area,
+          joinedDate: joinedStamp(),
+          badgeColor: palette.badgeColor,
+          initialsColor: palette.initialsColor,
+        });
+        setFormVisible(false);
+        setSuccess({
+          visible: true,
+          title: 'Driver added',
+          message: `${draft.name} can now sign in with the email and password provided.`,
+        });
+      }
+    } catch (err) {
+      setError({
         visible: true,
-        title: 'Driver updated',
-        message: `${draft.name}'s details have been updated.`,
+        message:
+          err instanceof Error ? err.message : 'Something went wrong saving the driver.',
       });
-    } else {
-      const palette = AVATAR_PALETTE[drivers.length % AVATAR_PALETTE.length];
-      addDriver({
-        id: `d${Date.now()}`,
-        initials: initialsFor(draft.name),
-        name: draft.name,
-        email: draft.email,
-        password: draft.password,
-        phone: draft.phone,
-        vehicle: draft.vehicle,
-        registration: draft.registration,
-        area: draft.area,
-        joinedDate: joinedStamp(),
-        badgeColor: palette.badgeColor,
-        initialsColor: palette.initialsColor,
-      });
-      setFormVisible(false);
-      setSuccess({
-        visible: true,
-        title: 'Driver added',
-        message: `${draft.name} has been added to your drivers.`,
-      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedDriver) {
-      deleteDriver(selectedDriver.id);
+  const handleConfirmDelete = async () => {
+    if (!selectedDriver) {
+      setDeleteVisible(false);
+      setDetailVisible(false);
+      setSelectedDriver(null);
+      return;
     }
-    setDeleteVisible(false);
-    setDetailVisible(false);
-    setSelectedDriver(null);
-    setSuccess({
-      visible: true,
-      title: 'Driver removed',
-      message: 'The driver has been deleted.',
-    });
+
+    setSaving(true);
+    try {
+      await DriverServices.deleteDriver(selectedDriver.id);
+      deleteDriver(selectedDriver.id);
+      setDeleteVisible(false);
+      setDetailVisible(false);
+      setSelectedDriver(null);
+      setSuccess({
+        visible: true,
+        title: 'Driver removed',
+        message: 'The driver has been deleted.',
+      });
+    } catch (err) {
+      setDeleteVisible(false);
+      setError({
+        visible: true,
+        message:
+          err instanceof Error ? err.message : 'Something went wrong deleting the driver.',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderDriver = ({ item }: { item: AdminDriver }) => (
@@ -728,6 +797,7 @@ export default function DriversScreen({ navigation }: Props) {
       <DriverFormModal
         visible={formVisible}
         driver={formDriver}
+        saving={saving}
         onClose={() => setFormVisible(false)}
         onSave={handleSave}
       />
@@ -783,6 +853,16 @@ export default function DriversScreen({ navigation }: Props) {
         title={success.title}
         message={success.message}
         onClose={() => setSuccess((prev) => ({ ...prev, visible: false }))}
+      />
+
+      <FancyAlert
+        visible={error.visible}
+        icon="alert-circle-outline"
+        iconColor="#C2383C"
+        iconBackground="#FDE7E8"
+        title="Could not save driver"
+        message={error.message}
+        onClose={() => setError((prev) => ({ ...prev, visible: false }))}
       />
     </SafeAreaView>
   );
@@ -1078,15 +1158,22 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   formSave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 52,
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 6,
     elevation: 3,
     shadowColor: BLUE,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
+  },
+  formSaveDisabled: {
+    opacity: 0.6,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   formSaveText: {
     fontFamily: 'Poppins_600SemiBold',

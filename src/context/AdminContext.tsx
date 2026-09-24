@@ -2,11 +2,25 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
-import { useNotifications } from "./NotificationsContext";
+import {
+  listDriverOrders,
+  rowsToAdminOrders,
+  assignDriverToBooking,
+  updateBookingStatus,
+  listAdminCustomers,
+  listAdminDrivers,
+  listAdminPayments,
+  listAdminReviews,
+  type AdminCustomerRow,
+  type AdminDriverRow,
+  type AdminPaymentRow,
+  type AdminReviewRow,
+} from "../services/adminOrderServices";
 
 export type AdminOrderStatus = "Pending" | "In Progress" | "Completed";
 
@@ -35,6 +49,7 @@ export type AdminOrder = {
   instructions: string;
   laundromat?: string;
   laundromatAddress?: string;
+  bookingReference?: string;
 };
 
 export type AdminCustomer = {
@@ -81,16 +96,44 @@ export type AdminService = {
   price: number;
 };
 
+export type AdminPayment = {
+  id: string;
+  bookingReference: string;
+  customerName: string;
+  amount: number;
+  method: string;
+  status: string;
+  reference?: string;
+  paidAt: string;
+};
+
+export type AdminReview = {
+  id: string;
+  bookingReference: string;
+  customerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
 type AdminContextValue = {
   orders: AdminOrder[];
   customers: AdminCustomer[];
   drivers: AdminDriver[];
+  payments: AdminPayment[];
+  reviews: AdminReview[];
   pricing: Pricing;
   services: AdminService[];
   addOrder: (order: AdminOrder) => void;
+  refreshOrders: () => void;
   updateOrderStatus: (id: string, status: AdminOrderStatus) => void;
   updateOrder: (id: string, patch: Partial<AdminOrder>) => void;
-  assignDriver: (id: string, driverName: string, driverPhone: string) => void;
+  assignDriver: (
+    id: string,
+    driverId: string,
+    driverName: string,
+    driverPhone: string,
+  ) => void;
   addCustomer: (customer: AdminCustomer) => void;
   updateCustomer: (id: string, patch: Partial<AdminCustomer>) => void;
   deleteCustomer: (id: string) => void;
@@ -123,10 +166,10 @@ export function getOrderSubtotal(order: AdminOrder): number {
 
 const seedDrivers: AdminDriver[] = [
   {
-    id: "d1",
+    id: "10000000-0000-0000-0000-000000000001",
     initials: "SN",
     name: "Sipho Nkosi",
-    email: "sipho@pickup.co.za",
+    email: "sipho@laundrypickup.co.za",
     password: "Sipho#Nkosi",
     phone: "083 214 5567",
     vehicle: "White VW Caddy",
@@ -137,10 +180,10 @@ const seedDrivers: AdminDriver[] = [
     initialsColor: "#3678E5",
   },
   {
-    id: "d2",
+    id: "10000000-0000-0000-0000-000000000002",
     initials: "TD",
     name: "Thabo Dube",
-    email: "thabo@pickup.co.za",
+    email: "thabo@laundrypickup.co.za",
     password: "Thabo$Dube",
     phone: "081 556 9012",
     vehicle: "Silver Toyota Corolla",
@@ -151,10 +194,10 @@ const seedDrivers: AdminDriver[] = [
     initialsColor: "#7958D5",
   },
   {
-    id: "d3",
+    id: "10000000-0000-0000-0000-000000000003",
     initials: "JE",
     name: "Jeff Erasmus",
-    email: "jeff@pickup.co.za",
+    email: "jeff@laundrypickup.co.za",
     password: "Jeff!Erasmus",
     phone: "072 887 3419",
     vehicle: "Blue Ford Fiesta",
@@ -165,10 +208,10 @@ const seedDrivers: AdminDriver[] = [
     initialsColor: "#21A86A",
   },
   {
-    id: "d4",
+    id: "10000000-0000-0000-0000-000000000004",
     initials: "DM",
     name: "David Mthembu",
-    email: "david@pickup.co.za",
+    email: "david@laundrypickup.co.za",
     password: "David#Mthe",
     phone: "079 412 6678",
     vehicle: "Grey Nissan Bakkie",
@@ -179,10 +222,10 @@ const seedDrivers: AdminDriver[] = [
     initialsColor: "#E89A12",
   },
   {
-    id: "d5",
+    id: "10000000-0000-0000-0000-000000000005",
     initials: "LM",
     name: "Lerato Mahlangu",
-    email: "lerato@pickup.co.za",
+    email: "lerato@laundrypickup.co.za",
     password: "Lerato/Mahlangu",
     phone: "082 445 8899",
     vehicle: "White Toyota Bakkie",
@@ -194,7 +237,7 @@ const seedDrivers: AdminDriver[] = [
     
   },
   {
-    id: "d6",
+    id: "10000000-0000-0000-0000-000000000006",
     initials: "ZN",
     name: "Zanele Ndlovu",
     email: "zanele@laundrypickup.co.za",
@@ -217,25 +260,219 @@ const DEFAULT_PRICING: Pricing = {
 
 const DEFAULT_SERVICES: AdminService[] = [];
 
+const BADGE_COLORS = [
+  '#E8F2FF',
+  '#F0E9FF',
+  '#E7F8EE',
+  '#FFF1D6',
+  '#E9F7F8',
+  '#FFE8EF',
+];
+const INITIAL_COLORS = [
+  '#3678E5',
+  '#7958D5',
+  '#21A86A',
+  '#E89A12',
+  '#228A92',
+  '#D95B82',
+];
+
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
+
+function joinedDateLabel(iso: string): string {
+  const date = new Date(iso);
+  return `Joined ${date.toLocaleString('en-US', {
+    month: 'short',
+  })} ${date.getFullYear()}`;
+}
+
+function customerRowToAdminCustomer(
+  row: AdminCustomerRow,
+  index: number
+): AdminCustomer {
+  return {
+    id: row.id,
+    initials: initialsOf(row.name) || 'CU',
+    name: row.name,
+    email: row.email,
+    phone: row.phone ?? '',
+    totalOrders: Number(row.total_orders ?? 0),
+    joinedDate: joinedDateLabel(row.created_at),
+    badgeColor: BADGE_COLORS[index % BADGE_COLORS.length],
+    initialsColor: INITIAL_COLORS[index % INITIAL_COLORS.length],
+  };
+}
+
+function driverRowToAdminDriver(
+  row: AdminDriverRow,
+  index: number,
+  password: string
+): AdminDriver {
+  return {
+    id: row.id,
+    initials: initialsOf(row.name) || 'DR',
+    name: row.name,
+    email: row.email,
+    password,
+    phone: row.phone ?? '',
+    vehicle: row.vehicle ?? '',
+    registration: row.registration ?? '',
+    area: (row.area || 'Woodstock') as AdminDriver['area'],
+    joinedDate: joinedDateLabel(row.created_at),
+    badgeColor: BADGE_COLORS[index % BADGE_COLORS.length],
+    initialsColor: INITIAL_COLORS[index % INITIAL_COLORS.length],
+  };
+}
+
+function mergeDrivers(db: AdminDriver[], prev: AdminDriver[]): AdminDriver[] {
+  const dbEmails = new Set(db.map((d) => d.email.toLowerCase()));
+  const prevByEmail = new Map(prev.map((d) => [d.email.toLowerCase(), d]));
+  const merged = db.map((row) => {
+    const existing = prevByEmail.get(row.email.toLowerCase());
+    return existing ? { ...row, password: existing.password } : row;
+  });
+  for (const prevItem of prev) {
+    if (!dbEmails.has(prevItem.email.toLowerCase())) {
+      merged.push(prevItem);
+    }
+  }
+  return merged;
+}
+
+const SEED_DRIVER_PASSWORDS = new Map(
+  seedDrivers.map((driver) => [driver.email.toLowerCase(), driver.password])
+);
+
+function paymentRowToAdminPayment(row: AdminPaymentRow): AdminPayment {
+  return {
+    id: row.id,
+    bookingReference: row.booking_reference,
+    customerName: row.customer_name,
+    amount: Number(row.amount ?? 0),
+    method: row.method,
+    status: row.status,
+    reference: row.reference ?? undefined,
+    paidAt: row.paid_at,
+  };
+}
+
+function reviewRowToAdminReview(row: AdminReviewRow): AdminReview {
+  return {
+    id: row.id,
+    bookingReference: row.booking_reference ?? '',
+    customerName: row.customer_name,
+    rating: Number(row.rating ?? 0),
+    comment: row.comment,
+    createdAt: row.created_at,
+  };
+}
+
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
   const [drivers, setDrivers] = useState<AdminDriver[]>(seedDrivers);
+  const [payments, setPayments] = useState<AdminPayment[]>([]);
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [pricing, setPricing] = useState<Pricing>(DEFAULT_PRICING);
   const [services, setServices] = useState<AdminService[]>(DEFAULT_SERVICES);
-  const { pushNotification } = useNotifications();
 
   const addOrder = useCallback((order: AdminOrder) => {
     setOrders((prev) => [order, ...prev]);
   }, []);
+
+  const refreshOrders = useCallback(async () => {
+    try {
+      const rows = await listDriverOrders();
+      const dbOrders = rowsToAdminOrders(rows);
+      setOrders((prev) => {
+        const refs = new Set(
+          dbOrders
+            .map((o) => o.bookingReference)
+            .filter((r): r is string => !!r),
+        );
+        const localOnly = prev.filter(
+          (o) => !o.bookingReference || !refs.has(o.bookingReference),
+        );
+        return [...dbOrders, ...localOnly];
+      });
+    } catch {
+      // DB not reachable yet - keep local state.
+    }
+
+    try {
+      const customerRows = await listAdminCustomers();
+      setCustomers(customerRows.map(customerRowToAdminCustomer));
+    } catch {
+      // Keep existing customers on failure.
+    }
+
+    try {
+      const driverRows = await listAdminDrivers();
+      setDrivers((prev) => {
+        const prevByEmail = new Map(
+          prev.map((driver) => [driver.email.toLowerCase(), driver]),
+        );
+        return mergeDrivers(
+          driverRows.map((row, index) =>
+            driverRowToAdminDriver(
+              row,
+              index,
+              prevByEmail.get(row.email.toLowerCase())?.password ??
+                SEED_DRIVER_PASSWORDS.get(row.email.toLowerCase()) ??
+                '',
+            ),
+          ),
+          prev,
+        );
+      });
+    } catch {
+      // Keep seed/local drivers on failure.
+    }
+
+    try {
+      const paymentRows = await listAdminPayments();
+      setPayments(paymentRows.map(paymentRowToAdminPayment));
+    } catch {
+      // Keep existing payments on failure.
+    }
+
+    try {
+      const reviewRows = await listAdminReviews();
+      setReviews(reviewRows.map(reviewRowToAdminReview));
+    } catch {
+      // Keep existing reviews on failure.
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshOrders();
+  }, [refreshOrders]);
+
+  useEffect(() => {
+    const handle = setInterval(refreshOrders, 5000);
+    return () => clearInterval(handle);
+  }, [refreshOrders]);
 
   const updateOrderStatus = useCallback(
     (id: string, status: AdminOrderStatus) => {
       setOrders((prev) =>
         prev.map((order) => (order.id === id ? { ...order, status } : order)),
       );
+      const target = orders.find((o) => o.id === id);
+      if (target?.bookingReference) {
+        updateBookingStatus(target.bookingReference, status).catch(() => {
+          // Keep the optimistic local update even if persistence fails.
+        });
+      }
     },
-    [],
+    [orders],
   );
 
   const updateOrder = useCallback((id: string, patch: Partial<AdminOrder>) => {
@@ -245,7 +482,14 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const assignDriver = useCallback(
-    (id: string, driverName: string, driverPhone: string) => {
+    async (
+      id: string,
+      driverId: string,
+      driverName: string,
+      driverPhone: string,
+    ) => {
+      const target = orders.find((o) => o.id === id);
+
       setOrders((prev) =>
         prev.map((order) => {
           if (order.id !== id) return order;
@@ -257,16 +501,16 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           };
         }),
       );
-      pushNotification({
-        kind: "order_assigned",
-        audience: "driver",
-        recipientName: driverName,
-        orderId: id,
-        title: "New Order Assigned",
-        message: `Order ${id} has been assigned to you. Please check your Orders tab to view the details.`,
-      }).catch(() => undefined);
+
+      if (target?.bookingReference && driverId) {
+        try {
+          await assignDriverToBooking(target.bookingReference, driverId);
+        } catch {
+          // Keep the optimistic local assignment even if persistence fails.
+        }
+      }
     },
-    [pushNotification],
+    [orders],
   );
 
   const addCustomer = useCallback((customer: AdminCustomer) => {
@@ -350,9 +594,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       orders,
       customers,
       drivers,
+      payments,
+      reviews,
       pricing,
       services,
       addOrder,
+      refreshOrders,
       updateOrderStatus,
       updateOrder,
       assignDriver,
@@ -372,9 +619,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       orders,
       customers,
       drivers,
+      payments,
+      reviews,
       pricing,
       services,
       addOrder,
+      refreshOrders,
       updateOrderStatus,
       updateOrder,
       assignDriver,

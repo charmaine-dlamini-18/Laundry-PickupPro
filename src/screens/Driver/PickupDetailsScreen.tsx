@@ -224,7 +224,8 @@ export default function PickupDetailsScreen({ navigation, route }: Props) {
           activeOpacity={0.85}
           onPress={() =>
             navigation.navigate('ChatScreen', {
-              orderId: order.orderNumber,
+              orderId: order.bookingReference ?? order.orderNumber,
+              orderLabel: order.orderNumber,
               contactName: order.customer,
               myRole: 'driver',
               myName: user?.name ?? 'Driver',

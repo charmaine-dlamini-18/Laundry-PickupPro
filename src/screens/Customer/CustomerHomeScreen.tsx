@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useOrders } from '../../context/OrdersContext';
 import { useNotifications } from '../../context/NotificationsContext';
+import { addCustomerReview } from '../../services/adminOrderServices';
 import {
   isOrderActive,
   type CustomerOrder,
@@ -111,6 +112,7 @@ export default function CustomerHomeScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [ratingVisible, setRatingVisible] = useState(false);
   const [rating, setRating] = useState(0);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const [ratingThanksVisible, setRatingThanksVisible] = useState(false);
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -388,13 +390,24 @@ export default function CustomerHomeScreen() {
             <TouchableOpacity
               style={styles.ratingSubmitTouch}
               activeOpacity={0.85}
-              onPress={() => {
+              disabled={rating === 0 || ratingSubmitting}
+              onPress={async () => {
+                setRatingSubmitting(true);
+                try {
+                  await addCustomerReview('', rating, '');
+                } catch {
+                  // Persist best-effort; still show thanks.
+                } finally {
+                  setRatingSubmitting(false);
+                }
                 setRatingVisible(false);
                 setRatingThanksVisible(true);
               }}
             >
               <LinearGradient colors={GRADIENT_HEADER} style={styles.ratingSubmit}>
-                <Text style={styles.ratingSubmitText}>Submit rating</Text>
+                <Text style={styles.ratingSubmitText}>
+                  {ratingSubmitting ? 'Submitting…' : 'Submit rating'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 

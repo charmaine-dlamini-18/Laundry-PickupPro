@@ -75,8 +75,12 @@ const KIND_META: Record<
   { icon: Icon; type: NotificationType }
 > = {
   order_assigned: { icon: 'calendar-check-outline', type: 'order' },
-  new_message: { icon: 'message-text-outline', type: 'system' },
+  driver_assigned: { icon: 'truck-delivery-outline', type: 'order' },
+  order_placed: { icon: 'clipboard-check-outline', type: 'order' },
+  order_updated: { icon: 'update', type: 'order' },
   order_delivered: { icon: 'package-variant-closed-check', type: 'system' },
+  new_message: { icon: 'message-text-outline', type: 'system' },
+  info: { icon: 'information-outline', type: 'system' },
 };
 
 function relativeTime(iso: string): string {

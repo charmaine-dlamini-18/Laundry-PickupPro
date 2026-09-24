@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -23,15 +23,14 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import type { CustomerStackParamList } from '../../navigation/types';
+import {
+  deleteAddress,
+  fetchSavedAddresses,
+  saveAddress,
+  type SavedAddress,
+} from '../../services/addressService';
 
 type Props = NativeStackScreenProps<CustomerStackParamList, 'Addresses'>;
-
-type SavedAddress = {
-  id: string;
-  label: string;
-  address: string;
-  isDefault: boolean;
-};
 
 const TEAL = '#0E9AA7';
 const TEAL_TINT = '#D6F0F4';
@@ -50,33 +49,13 @@ const GRADIENT_VIBRANT = ['#2E6BFF', '#7857FF'] as const;
 const GRADIENT_GREEN = ['#00A85A', '#0B7A50'] as const;
 const GRADIENT_DANGER = ['#E5484D', '#C2383C'] as const;
 
-const initialAddresses: SavedAddress[] = [
-  {
-    id: 'addr-1',
-    label: 'Home',
-    address: '172 Sir Lowry Rd, Woodstock',
-    isDefault: true,
-  },
-  {
-    id: 'addr-2',
-    label: 'Work',
-    address: '123 Main Road, Cape Town',
-    isDefault: false,
-  },
-  {
-    id: 'addr-3',
-    label: 'Work',
-    address: '45 Albert Road, Observatory',
-    isDefault: false,
-  },
-];
-
 type EditingAddress = SavedAddress | null;
 
 const isWeb = Platform.OS === 'web';
 
 export default function AdressesScreen({ navigation }: Props) {
-  const [addresses, setAddresses] = useState<SavedAddress[]>(initialAddresses);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -89,6 +68,24 @@ export default function AdressesScreen({ navigation }: Props) {
   const [address, setAddress] = useState('');
   const [makeDefault, setMakeDefault] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SavedAddress | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetchSavedAddresses()
+      .then((records) => {
+        if (active) setAddresses(records);
+      })
+      .catch(() => {
+        if (active) setAddresses([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!fontsLoaded) return null;
 
@@ -112,14 +109,22 @@ export default function AdressesScreen({ navigation }: Props) {
     setDeleteTarget(item);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteTarget) {
-      setAddresses((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      try {
+        const records = await deleteAddress(deleteTarget.id);
+        setAddresses(records);
+      } catch (error) {
+        Alert.alert(
+          'Delete failed',
+          error instanceof Error ? error.message : 'Something went wrong.'
+        );
+      }
     }
     setDeleteTarget(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedLabel = label.trim();
     const trimmedAddress = address.trim();
     if (!trimmedLabel || !trimmedAddress) {
@@ -127,43 +132,41 @@ export default function AdressesScreen({ navigation }: Props) {
       return;
     }
 
-    setAddresses((prev) => {
-      const base = makeDefault
-        ? prev.map((a) => ({ ...a, isDefault: false }))
-        : prev;
-
-      if (editing) {
-        const updated = base.map((a) =>
-          a.id === editing.id
-            ? { ...a, label: trimmedLabel, address: trimmedAddress, isDefault: makeDefault }
-            : a
-        );
-        if (!makeDefault && !updated.some((a) => a.isDefault)) {
-          return updated.map((a, i) => (i === 0 ? { ...a, isDefault: true } : a));
-        }
-        return updated;
-      }
-
-      const next: SavedAddress = {
-        id: `addr-${Date.now()}`,
+    setSaving(true);
+    try {
+      const records = await saveAddress({
+        id: editing?.id,
         label: trimmedLabel,
         address: trimmedAddress,
         isDefault: makeDefault,
-      };
-      const result = [next, ...base];
-      if (!result.some((a) => a.isDefault)) {
-        result[0] = { ...result[0], isDefault: true };
-      }
-      return result;
-    });
-
-    setShowModal(false);
+      });
+      setAddresses(records);
+      setShowModal(false);
+    } catch (error) {
+      Alert.alert(
+        'Save failed',
+        error instanceof Error ? error.message : 'Something went wrong.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSetDefault = (item: SavedAddress) => {
-    setAddresses((prev) =>
-      prev.map((a) => ({ ...a, isDefault: a.id === item.id }))
-    );
+  const handleSetDefault = async (item: SavedAddress) => {
+    try {
+      const records = await saveAddress({
+        id: item.id,
+        label: item.label,
+        address: item.address,
+        isDefault: true,
+      });
+      setAddresses(records);
+    } catch (error) {
+      Alert.alert(
+        'Update failed',
+        error instanceof Error ? error.message : 'Something went wrong.'
+      );
+    }
   };
 
   const defaultAddress = addresses.find((a) => a.isDefault);
@@ -203,9 +206,13 @@ export default function AdressesScreen({ navigation }: Props) {
         ListEmptyComponent={
           <View style={styles.empty}>
             <MaterialCommunityIcons name="map-marker-plus-outline" size={52} color="#C4D2E0" />
-            <Text style={styles.emptyTitle}>No saved addresses</Text>
+            <Text style={styles.emptyTitle}>
+              {loading ? 'Loading addresses…' : 'No saved addresses'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Add a home or work address to make booking faster.
+              {loading
+                ? 'Fetching your saved addresses.'
+                : 'Add a home or work address to make booking faster.'}
             </Text>
           </View>
         }
@@ -324,10 +331,17 @@ export default function AdressesScreen({ navigation }: Props) {
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveTouch} activeOpacity={0.9} onPress={handleSave}>
+              <TouchableOpacity
+                style={styles.modalSaveTouch}
+                activeOpacity={0.9}
+                disabled={saving}
+                onPress={handleSave}
+              >
                 <LinearGradient colors={GRADIENT_VIBRANT} style={styles.modalSave}>
                   <View style={styles.shine} />
-                  <Text style={styles.modalSaveText}>Save</Text>
+                  <Text style={styles.modalSaveText}>
+                    {saving ? 'Saving…' : 'Save'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
