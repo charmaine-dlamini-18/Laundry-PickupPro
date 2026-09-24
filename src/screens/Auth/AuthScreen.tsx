@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,11 +22,9 @@ import {
 
 import Button from '../../components/Button';
 import Input from '../../components/Input';
-import CredentialMismatchAlert from '../../components/CredentialMismatchAlert';
 import { useAuth } from '../../hooks/useAuth';
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
 import * as AuthServices from '../../services/AuthServices';
-import { useAdmin } from '../../context/AdminContext';
 import { colors } from '../../theme/colors';
 import {
   isEmail,
@@ -77,7 +76,6 @@ type RegisterErrors = {
 export default function AuthScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const { signIn } = useAuth();
-  const { validateDriverCredentials } = useAdmin();
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -88,15 +86,16 @@ export default function AuthScreen({ navigation, route }: Props) {
   const [mode, setMode] = useState<Mode>(route.params.mode ?? 'login');
 
   const isDriver = role === 'driver';
-  const activeSegments = isDriver ? DRIVER_SEGMENTS : SEGMENTS;
+  const canRegister = role === 'customer';
+  const activeSegments = canRegister ? SEGMENTS : DRIVER_SEGMENTS;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [credentialMismatch, setCredentialMismatch] = useState(false);
 
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -106,6 +105,13 @@ export default function AuthScreen({ navigation, route }: Props) {
   const [agree, setAgree] = useState(false);
   const [regErrors, setRegErrors] = useState<RegisterErrors>({});
   const [regLoading, setRegLoading] = useState(false);
+  const [regSuccessEmail, setRegSuccessEmail] = useState('');
+  const [regDialog, setRegDialog] = useState<
+    | { kind: 'sent'; email: string }
+    | { kind: 'error'; message: string }
+    | null
+  >(null);
+  const [resendNotice, setResendNotice] = useState('');
 
   if (!fontsLoaded) return null;
 
@@ -114,6 +120,10 @@ export default function AuthScreen({ navigation, route }: Props) {
     setEmailError('');
     setPasswordError('');
     setRegErrors({});
+    setRegSuccessEmail('');
+    setRegDialog(null);
+    setResendNotice('');
+    setLoginError('');
   };
 
   const handleLogin = async () => {
@@ -128,31 +138,16 @@ export default function AuthScreen({ navigation, route }: Props) {
 
     setEmailError(nextEmailError);
     setPasswordError(nextPasswordError);
+    setLoginError('');
 
     if (nextEmailError || nextPasswordError) return;
 
     setLoginLoading(true);
     try {
-      if (role === 'driver') {
-        const matchedDriver = validateDriverCredentials(email, password);
-        if (!matchedDriver) {
-          setCredentialMismatch(true);
-          setLoginLoading(false);
-          return;
-        }
-        const user = await AuthServices.login({ role, email, password });
-        signIn(role, {
-          ...user,
-          name: matchedDriver.name,
-          phone: matchedDriver.phone,
-        });
-      } else {
-        const user = await AuthServices.login({ role, email, password });
-        signIn(role, user);
-      }
+      const user = await AuthServices.login({ role, email, password });
+      signIn(role, user);
     } catch (error) {
-      Alert.alert(
-        'Sign in failed',
+      setLoginError(
         error instanceof Error ? error.message : 'Something went wrong.'
       );
     } finally {
@@ -199,24 +194,37 @@ export default function AuthScreen({ navigation, route }: Props) {
     setRegLoading(true);
     try {
       await AuthServices.register({
-  role,
-  name: regName,
-  email: regEmail,
-  phone: regPhone,
-  password: regPassword,
-});
+        role,
+        name: regName,
+        email: regEmail,
+        phone: regPhone,
+        password: regPassword,
+      });
 
-Alert.alert(
-  'Check your email',
-  'Your account has been created. Please confirm your email address before logging in.'
-);
+      setRegSuccessEmail(regEmail.trim());
+      setRegPassword('');
+      setRegConfirm('');
+      setResendNotice('');
+      setRegDialog({ kind: 'sent', email: regEmail.trim() });
     } catch (error) {
-      Alert.alert(
-        'Registration failed',
-        error instanceof Error ? error.message : 'Something went wrong.'
-      );
+      setRegDialog({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : 'Something went wrong.',
+      });
     } finally {
       setRegLoading(false);
+    }
+  };
+
+  const handleResend = async (email: string) => {
+    try {
+      await AuthServices.resendConfirmationEmail(email);
+      setResendNotice(`A new confirmation link was sent to ${email}.`);
+    } catch (error) {
+      setResendNotice(
+        error instanceof Error ? error.message : 'Could not resend.'
+      );
     }
   };
 
@@ -341,6 +349,10 @@ Alert.alert(
               </TouchableOpacity>
             </View>
 
+            {!!loginError && (
+              <Text style={styles.loginErrorText}>{loginError}</Text>
+            )}
+
             <Button
               title="Log In"
               onPress={handleLogin}
@@ -375,6 +387,35 @@ Alert.alert(
                 <Text style={styles.socialText}>Continue with Apple</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        ) : regSuccessEmail ? (
+          <View style={styles.successCard}>
+            <MaterialCommunityIcons
+              name="email-check-outline"
+              size={52}
+              color={ACCENT}
+            />
+            <Text style={styles.successTitle}>Check your email</Text>
+            <Text style={styles.successText}>
+              We sent a confirmation link to{' '}
+              <Text style={styles.successEmail}>{regSuccessEmail}</Text>.
+              Click the link to activate your account, then log in.
+            </Text>
+            <Button
+              title="Resend email"
+              onPress={() => {
+                void handleResend(regSuccessEmail);
+              }}
+              style={styles.submitButton}
+            />
+            {!!resendNotice && (
+              <Text style={styles.resendNotice}>{resendNotice}</Text>
+            )}
+            <Button
+              title="Back to Log In"
+              onPress={() => switchMode('login')}
+              style={styles.submitButton}
+            />
           </View>
         ) : (
           <View style={styles.form}>
@@ -470,7 +511,7 @@ Alert.alert(
         )}
 
         <View style={styles.footer}>
-          {!isDriver && (
+          {role === 'customer' && (
             <Text style={styles.footerText}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <Text
@@ -481,18 +522,84 @@ Alert.alert(
               </Text>
             </Text>
           )}
-          {isDriver && (
+          {role !== 'customer' && (
             <Text style={styles.footerText}>
-              Drivers are registered by the administrator.
+              {isDriver
+                ? 'Drivers are registered by the administrator.'
+                : 'Admin accounts are managed by the system.'}
             </Text>
           )}
         </View>
       </ScrollView>
 
-      <CredentialMismatchAlert
-        visible={credentialMismatch}
-        onClose={() => setCredentialMismatch(false)}
-      />
+      <Modal
+        visible={regDialog !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRegDialog(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View
+              style={[
+                styles.modalIconCircle,
+                regDialog?.kind === 'error' && styles.modalIconCircleError,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={
+                  regDialog?.kind === 'error'
+                    ? 'alert-circle-outline'
+                    : 'email-check-outline'
+                }
+                size={40}
+                color={
+                  regDialog?.kind === 'error' ? colors.danger : ACCENT
+                }
+              />
+            </View>
+            <Text style={styles.modalTitle}>
+              {regDialog?.kind === 'error'
+                ? 'Registration failed'
+                : 'Email sent'}
+            </Text>
+            <Text style={styles.modalText}>
+              {regDialog?.kind === 'error'
+                ? regDialog?.message
+                : `We sent a confirmation link to ${regDialog?.email}. Please check your inbox to confirm your address, then log in.`}
+            </Text>
+
+            {regDialog?.kind === 'error' ? (
+              <Button
+                title="Try Again"
+                onPress={() => setRegDialog(null)}
+                style={styles.submitButton}
+              />
+            ) : (
+              <View style={styles.modalActions}>
+                {!!resendNotice && (
+                  <Text style={styles.resendNotice}>{resendNotice}</Text>
+                )}
+                <Button
+                  title="Resend email"
+                  onPress={() => {
+                    void handleResend(regDialog?.email ?? '');
+                  }}
+                  style={styles.submitButton}
+                />
+                <Button
+                  title="Back to Log In"
+                  onPress={() => {
+                    setRegDialog(null);
+                    switchMode('login');
+                  }}
+                  style={styles.submitButton}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -592,6 +699,40 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
+  },
+  successCard: {
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 24,
+    paddingTop: 34,
+    paddingBottom: 30,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#26384A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  successTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 20,
+    color: TEXT_DARK,
+    marginTop: 16,
+  },
+  successText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 14,
+    lineHeight: 22,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  successEmail: {
+    fontFamily: 'Poppins_600SemiBold',
+    color: ACCENT,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -693,6 +834,13 @@ const styles = StyleSheet.create({
     color: colors.danger,
     marginBottom: 8,
   },
+  loginErrorText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: colors.danger,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
   footer: {
     alignItems: 'center',
     marginTop: 22,
@@ -705,5 +853,66 @@ const styles = StyleSheet.create({
   footerLink: {
     fontFamily: 'Poppins_600SemiBold',
     color: ACCENT,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 54, 63, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#26384A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+  },
+  modalIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#E5F0EF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalIconCircleError: {
+    backgroundColor: '#FBE9E9',
+  },
+  modalActions: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  resendNotice: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 13,
+    color: ACCENT,
+    textAlign: 'center',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  modalTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 20,
+    color: TEXT_DARK,
+    marginTop: 14,
+  },
+  modalText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 14,
+    lineHeight: 22,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 20,
   },
 });

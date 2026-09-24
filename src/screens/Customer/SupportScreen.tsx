@@ -217,7 +217,8 @@ export default function SupportScreen({ navigation }: Props) {
                 activeOpacity={0.85}
                 onPress={() =>
                   navigation.navigate('Chat', {
-                    orderId: activeOrderWithDriver.id,
+                    orderId: activeOrderWithDriver.reference ?? activeOrderWithDriver.id,
+                    orderLabel: activeOrderWithDriver.reference,
                     contactName: activeOrderWithDriver.driver!,
                     myRole: 'customer',
                     myName: user?.name ?? 'Customer',

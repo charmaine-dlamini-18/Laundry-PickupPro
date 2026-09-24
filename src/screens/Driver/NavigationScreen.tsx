@@ -39,7 +39,7 @@ type Props = NativeStackScreenProps<
 >;
 
 type Stop = {
-    id: number;
+    id: string;
     orderNumber: string;
     type: 'Pickup' | 'Delivery';
     customer: string;
@@ -64,7 +64,7 @@ export default function NavigationScreen({
     });
 
     const [started, setStarted] = useState(false);
-    const [completedIds, setCompletedIds] = useState<number[]>([]);
+    const [completedIds, setCompletedIds] = useState<string[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     const routeStops = useMemo<Stop[]>(

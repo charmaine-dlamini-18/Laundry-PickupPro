@@ -279,7 +279,7 @@ export default function BookPickupScreen({ navigation }: Props) {
     navigation.navigate('Step2');
   };
 
-  const showBothAddresses = booking.pickupAddress.trim() && booking.deliveryAddress.trim();
+  const showBothAddresses = Boolean(booking.pickupAddress.trim() && booking.deliveryAddress.trim());
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -452,7 +452,7 @@ export default function BookPickupScreen({ navigation }: Props) {
               />
             </LinearGradient>
 
-            {booking.pickupAddress.trim() && booking.assignedLaundromat && (
+            {booking.pickupAddress.trim() && booking.assignedLaundromat ? (
               <View style={styles.laundromatCard}>
                 <LinearGradient
                   colors={[GREEN_TINT, '#B8F0D0']}
@@ -470,7 +470,7 @@ export default function BookPickupScreen({ navigation }: Props) {
                   </View>
                 </LinearGradient>
               </View>
-            )}
+            ) : null}
 
             {booking.assignedLaundromat && (
               <View style={styles.deliveryInfo}>

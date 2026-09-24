@@ -2,14 +2,19 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import type { CustomerOrder, OrderStatus } from '../data/orders';
+import { useAuth } from '../hooks/useAuth';
+import { fetchCustomerBookings } from '../services/bookingServices';
 
 type OrdersContextValue = {
   orders: CustomerOrder[];
+  loading: boolean;
+  refresh: () => Promise<void>;
   addOrder: (order: CustomerOrder) => void;
   updateOrderStatus: (id: string, status: OrderStatus) => void;
   getOrder: (id: string) => CustomerOrder | undefined;
@@ -18,7 +23,38 @@ type OrdersContextValue = {
 const OrdersContext = createContext<OrdersContextValue | undefined>(undefined);
 
 export function OrdersProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (user?.role === 'customer' && user.id) {
+      setLoading(true);
+      try {
+        const records = await fetchCustomerBookings(user.id);
+        setOrders(records);
+      } catch {
+        // keep the current list on failure
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setOrders([]);
+      setLoading(false);
+    }
+  }, [user?.id, user?.role]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (user?.role !== 'customer') return;
+    const handle = setInterval(() => {
+      refresh().catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(handle);
+  }, [refresh, user?.role]);
 
   const addOrder = useCallback((order: CustomerOrder) => {
     setOrders((prev) => [order, ...prev]);
@@ -36,8 +72,8 @@ export function OrdersProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<OrdersContextValue>(
-    () => ({ orders, addOrder, updateOrderStatus, getOrder }),
-    [orders, addOrder, updateOrderStatus, getOrder]
+    () => ({ orders, loading, refresh, addOrder, updateOrderStatus, getOrder }),
+    [orders, loading, refresh, addOrder, updateOrderStatus, getOrder]
   );
 
   return (

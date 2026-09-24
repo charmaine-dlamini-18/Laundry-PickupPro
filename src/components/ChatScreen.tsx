@@ -22,15 +22,15 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import { useChat, type ChatRole } from '../context/ChatContext';
-import { useNotifications } from '../context/NotificationsContext';
 
 const isWeb = Platform.OS === 'web';
 
-type ChatScreenParams = {
+export type ChatScreenParams = {
   orderId: string;
   contactName: string;
   myRole: ChatRole;
   myName: string;
+  orderLabel?: string;
 };
 
 export default function ChatScreen({ route }: { route?: { params?: ChatScreenParams } }) {
@@ -39,15 +39,15 @@ export default function ChatScreen({ route }: { route?: { params?: ChatScreenPar
   const hasOrder = Boolean(
     params && params.orderId.trim() && params.contactName.trim()
   );
-  const { orderId, contactName, myRole, myName } = params ?? {
+  const { orderId, contactName, myRole, myName, orderLabel } = params ?? {
     orderId: '',
     contactName: '',
     myRole: 'customer' as ChatRole,
     myName: 'You',
+    orderLabel: undefined,
   };
 
   const { getMessages, sendMessage, loadMessages } = useChat();
-  const { pushNotification } = useNotifications();
   const [input, setInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const [fontsLoaded] = useFonts({
@@ -88,14 +88,6 @@ export default function ChatScreen({ route }: { route?: { params?: ChatScreenPar
     const text = input.trim();
     if (!text || !hasOrder) return;
     sendMessage(orderId, text, myRole, myName);
-    pushNotification({
-      kind: 'new_message',
-      audience: myRole === 'customer' ? 'driver' : 'customer',
-      recipientName: contactName,
-      orderId,
-      title: 'New Message',
-      message: `${myName} sent you a message about order ${orderId}.`,
-    }).catch(() => undefined);
     setInput('');
   };
 
@@ -141,7 +133,7 @@ export default function ChatScreen({ route }: { route?: { params?: ChatScreenPar
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{contactName}</Text>
-          <Text style={styles.headerOrder}>Order {orderId}</Text>
+          <Text style={styles.headerOrder}>Order {orderLabel || orderId}</Text>
         </View>
       </View>
 

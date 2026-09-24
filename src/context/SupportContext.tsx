@@ -14,6 +14,7 @@ import {
   type SupportMessage,
   type SupportMessageStatus,
 } from '../services/supportService';
+import { useAuth } from '../hooks/useAuth';
 
 export type { SupportMessage, SupportMessageStatus } from '../services/supportService';
 
@@ -38,14 +39,19 @@ const SupportContext = createContext<SupportContextValue | undefined>(
 );
 
 export function SupportProvider({ children }: { children: React.ReactNode }) {
+  const { role } = useAuth();
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetchSupportMessages()
+    setLoading(true);
+    fetchSupportMessages(role)
       .then((records) => {
         if (active) setMessages(records);
+      })
+      .catch(() => {
+        if (active) setMessages([]);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -53,7 +59,7 @@ export function SupportProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [role]);
 
   const addMessage = useCallback(async (input: NewSupportMessage) => {
     const record = await createSupportMessage(input);

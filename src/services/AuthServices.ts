@@ -1,5 +1,19 @@
 import type { Role, User } from '../types';
+import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
+
+function getRedirectTo(): string | undefined {
+  const fromEnv = process.env.EXPO_PUBLIC_APP_URL;
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return undefined;
+}
 
 type LoginInput = {
   role: Role;
@@ -84,6 +98,7 @@ export async function register({
         name: name.trim(),
         phone: phone.trim(),
       },
+      emailRedirectTo: getRedirectTo(),
     },
   });
 
@@ -104,12 +119,28 @@ export async function register({
   };
 }
 
+export async function resendConfirmationEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+    options: {
+      emailRedirectTo: getRedirectTo(),
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function forgotPassword(email: string): Promise<void> {
   if (!email.trim()) {
     throw new Error('Please enter your email address.');
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: getRedirectTo(),
+  });
 
   if (error) {
     throw new Error(error.message);

@@ -19,10 +19,12 @@ import HelpSupportScreen from '../screens/Driver/HelpSupportScreen';
 import ChangePasswordScreen from '../screens/Driver/ChangePasswordScreen';
 import NavigationScreen from '../screens/Driver/NavigationScreen';
 import ChatScreen from '../components/ChatScreen';
+import type { ChatScreenParams } from '../components/ChatScreen';
 
 export type Order = {
-  id: number;
+  id: string;
   orderNumber: string;
+  bookingReference?: string;
   type: string;
   customer: string;
   address: string;
@@ -67,12 +69,7 @@ export type DriverStackParamList = {
     order: Order;
   };
 
-  ChatScreen: {
-    orderId: string;
-    contactName: string;
-    myRole: 'customer' | 'driver';
-    myName: string;
-  };
+  ChatScreen: ChatScreenParams;
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();

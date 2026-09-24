@@ -37,6 +37,9 @@ const TEXT_DARK = '#1F2933';
 const TEXT_MUTED = '#7A869A';
 const BORDER = '#E8ECF1';
 const WHITE = '#FFFFFF';
+const GREEN_PARSE = '#00A85A';
+const FAIL_RED = '#E5484D';
+const AMBER_STATUS = '#E8960C';
 
 const GRADIENT_VIBRANT = [BLUE, PURPLE] as const;
 
@@ -62,7 +65,7 @@ function formatRangeLabel(start: Date, end: Date): string {
 }
 
 export default function ReportsScreen({ navigation }: Props) {
-  const { orders } = useAdmin();
+  const { orders, payments, reviews } = useAdmin();
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -218,6 +221,149 @@ export default function ReportsScreen({ navigation }: Props) {
                 ))}
               </View>
             </View>
+          )}
+        </View>
+
+        <View style={styles.reportCard}>
+          <Text style={styles.cardTitle}>Payments</Text>
+          {payments.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="credit-card-outline"
+                size={34}
+                color={BLUE_TINT}
+              />
+              <Text style={styles.emptyTitle}>No payments yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Captured payments will appear here after customers book.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.paySummary}>
+                <View>
+                  <Text style={styles.paySummaryValue}>
+                    {formatMoney(
+                      payments.reduce(
+                        (sum, payment) =>
+                          sum +
+                          (payment.status === 'Captured' ||
+                          payment.status === 'Pending'
+                            ? payment.amount
+                            : 0),
+                        0
+                      )
+                    )}
+                  </Text>
+                  <Text style={styles.paySummaryLabel}>
+                    Processed · {payments.length}{' '}
+                    {payments.length === 1 ? 'payment' : 'payments'}
+                  </Text>
+                </View>
+                <View style={styles.paySummaryIcon}>
+                  <MaterialCommunityIcons name="cash-multiple" size={22} color={GREEN_PARSE} />
+                </View>
+              </View>
+              {payments.slice(0, 6).map((payment, index) => (
+                <View
+                  key={payment.id ?? `${payment.bookingReference}-${index}`}
+                  style={[
+                    styles.payRow,
+                    index === 0 && styles.payRowFirst,
+                  ]}
+                >
+                  <View style={styles.payMethodIcon}>
+                    <MaterialCommunityIcons
+                      name={
+                        payment.method === 'Cash'
+                          ? 'cash'
+                          : payment.method === 'EFT'
+                            ? 'bank-outline'
+                            : 'credit-card-outline'
+                      }
+                      size={16}
+                      color={BLUE}
+                    />
+                  </View>
+                  <View style={styles.payBody}>
+                    <Text style={styles.payName} numberOfLines={1}>
+                      {payment.customerName}
+                    </Text>
+                    <Text style={styles.payRef} numberOfLines={1}>
+                      {payment.reference || payment.bookingReference}
+                    </Text>
+                  </View>
+                  <View style={styles.payRight}>
+                    <Text style={styles.payAmount}>
+                      {formatMoney(payment.amount)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.payStatus,
+                        payment.status === 'Captured'
+                          ? styles.payStatusCaptured
+                          : payment.status === 'Failed'
+                            ? styles.payStatusFailed
+                            : styles.payStatusPending,
+                      ]}
+                    >
+                      {payment.status}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
+
+        <View style={styles.reportCard}>
+          <Text style={styles.cardTitle}>Recent Reviews</Text>
+          {reviews.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="star-outline"
+                size={34}
+                color={BLUE_TINT}
+              />
+              <Text style={styles.emptyTitle}>No reviews yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Customer ratings will show up here as they come in.
+              </Text>
+            </View>
+          ) : (
+            reviews.slice(0, 6).map((review, index) => (
+              <View
+                key={review.id ?? `${review.bookingReference}-${index}`}
+                style={[styles.reviewRow, index === 0 && styles.reviewRowFirst]}
+              >
+                <View style={styles.reviewMeta}>
+                  <Text style={styles.reviewName} numberOfLines={1}>
+                    {review.customerName}
+                  </Text>
+                  <View style={styles.reviewStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <MaterialCommunityIcons
+                        key={star}
+                        name={star <= review.rating ? 'star' : 'star-outline'}
+                        size={14}
+                        color={star <= review.rating ? '#F5A623' : '#D4DBE3'}
+                      />
+                    ))}
+                  </View>
+                </View>
+                <Text style={styles.reviewComment} numberOfLines={3}>
+                  {review.comment || 'No comment provided.'}
+                </Text>
+                <Text style={styles.reviewDate}>
+                  {review.bookingReference} ·{' '}
+                  {new Date(review.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+            ))
           )}
         </View>
       </ScrollView>
@@ -447,5 +593,136 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 11,
     color: TEXT_DARK,
+  },
+  paySummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F6FBF8',
+    borderWidth: 1,
+    borderColor: '#DDECDF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  paySummaryValue: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 18,
+    color: TEXT_DARK,
+  },
+  paySummaryLabel: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 11,
+    color: TEXT_MUTED,
+    marginTop: 2,
+  },
+  paySummaryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DDF8E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  payRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F3F4',
+  },
+  payRowFirst: {
+    borderTopWidth: 0,
+  },
+  payMethodIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: BLUE_TINT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  payBody: {
+    flex: 1,
+    marginRight: 8,
+  },
+  payName: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 12,
+    color: TEXT_DARK,
+  },
+  payRef: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 10,
+    color: TEXT_MUTED,
+    marginTop: 2,
+  },
+  payRight: {
+    alignItems: 'flex-end',
+  },
+  payAmount: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 12,
+    color: TEXT_DARK,
+  },
+  payStatus: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 9,
+    marginTop: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  payStatusCaptured: {
+    color: GREEN_PARSE,
+    backgroundColor: '#DDF8E8',
+  },
+  payStatusPending: {
+    color: AMBER_STATUS,
+    backgroundColor: '#FFF0B8',
+  },
+  payStatusFailed: {
+    color: FAIL_RED,
+    backgroundColor: '#FDE7E8',
+  },
+  reviewRow: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F3F4',
+  },
+  reviewRowFirst: {
+    borderTopWidth: 0,
+  },
+  reviewMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reviewName: {
+    flex: 1,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 12,
+    color: TEXT_DARK,
+    marginRight: 8,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewComment: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+    color: TEXT_MUTED,
+    marginTop: 6,
+  },
+  reviewDate: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 10,
+    color: '#B9BEC7',
+    marginTop: 6,
   },
 });

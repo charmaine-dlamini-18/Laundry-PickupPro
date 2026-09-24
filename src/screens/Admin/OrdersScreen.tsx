@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   useFonts,
   Poppins_400Regular,
@@ -68,8 +69,14 @@ const FILTERS: FilterOption[] = [
 const isWeb = Platform.OS === 'web';
 
 export default function OrdersScreen({ navigation, route }: Props) {
-  const { orders, updateOrderStatus, assignDriver, addOrder } = useAdmin();
+  const { orders, refreshOrders, updateOrderStatus, assignDriver, addOrder } = useAdmin();
   const { addOrder: addDriverOrder } = useDriverOrders();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshOrders();
+    }, [refreshOrders]),
+  );
   const [selectedFilter, setSelectedFilter] =
     useState<FilterOption>(route.params?.filter ?? 'All');
   const [searchText, setSearchText] = useState('');
@@ -109,13 +116,18 @@ export default function OrdersScreen({ navigation, route }: Props) {
 
   if (!fontsLoaded) return null;
 
-  const handleAssignDriver = (orderId: string, driverName: string, driverPhone: string) => {
-    assignDriver(orderId, driverName, driverPhone);
+  const handleAssignDriver = (
+    orderId: string,
+    driverId: string,
+    driverName: string,
+    driverPhone: string,
+  ) => {
+    assignDriver(orderId, driverId, driverName, driverPhone);
 
     const adminOrder = orders.find((o) => o.id === orderId);
     if (adminOrder) {
       const driverOrder: Order = {
-        id: Date.now(),
+        id: String(Date.now()),
         orderNumber: adminOrder.id,
         type: 'Pickup',
         customer: adminOrder.customerName,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,8 @@ import BookingHeader from '../../components/BookingHeader';
 import { useBooking } from '../../context/BookingContext';
 import { useOrders } from '../../context/OrdersContext';
 import { useAdmin } from '../../context/AdminContext';
+import { useAuth } from '../../context/AuthContext';
+import { placeBooking } from '../../services/bookingServices';
 import type { AdminOrder } from '../../context/AdminContext';
 import type { BookingStackParamList } from '../../navigation/BookingNavigator';
 import { colors } from '../../theme/colors';
@@ -43,7 +46,8 @@ const isWeb = Platform.OS === 'web';
 export default function BookingSuccessScreen({ navigation }: Props) {
   const { booking, resetBooking } = useBooking();
   const { addOrder } = useOrders();
-  const { addOrder: addAdminOrder } = useAdmin();
+  const { addOrder: addAdminOrder, refreshOrders: refreshAdminOrders } = useAdmin();
+  const { user } = useAuth();
   const [reference] = useState(
     () => `LPP-${Math.floor(100000 + Math.random() * 900000)}`
   );
@@ -71,6 +75,38 @@ export default function BookingSuccessScreen({ navigation }: Props) {
     const deliveryDateStr = formatBookingDate(booking.deliveryDate);
     const deliveryTimeStr = formatTimeWindow(booking.deliveryTime);
     const serviceSubtotal = booking.total - booking.deliveryFee;
+
+    if (user) {
+      placeBooking({
+        userId: user.id,
+        reference,
+        customerName: user.name,
+        customerPhone: user.phone ?? '',
+        pickupAddress: booking.pickupAddress,
+        pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
+        deliveryAddress: booking.deliveryAddress,
+        deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
+        instructions: booking.instructions,
+        laundromat: booking.assignedLaundromat?.name,
+        laundromatAddress: booking.assignedLaundromat?.address,
+        bagCount: booking.bagCount,
+        total: booking.total,
+        paymentMethod: booking.paymentMethod,
+        items: [
+          {
+            name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
+            quantity: 1,
+            price: serviceSubtotal,
+          },
+        ],
+      })
+        .then(() => refreshAdminOrders())
+        .catch((err: unknown) => {
+          const message =
+            err instanceof Error ? err.message : 'Something went wrong.';
+          Alert.alert('Booking not saved', `${message} Please try again.`);
+        });
+    }
 
     addOrder({
       id: orderId,

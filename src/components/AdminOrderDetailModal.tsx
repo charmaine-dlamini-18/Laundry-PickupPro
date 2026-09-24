@@ -40,7 +40,12 @@ type Props = {
   order: AdminOrder | null;
   onClose: () => void;
   onUpdateStatus: (status: AdminOrderStatus) => void;
-  onAssignDriver: (orderId: string, driverName: string, driverPhone: string) => void;
+  onAssignDriver: (
+    orderId: string,
+    driverId: string,
+    driverName: string,
+    driverPhone: string,
+  ) => void;
 };
 
 const BLUE = '#2E6BFF';
@@ -369,7 +374,7 @@ export default function AdminOrderDetailModal({
                       onPress={() => {
                         const driver = drivers.find((d) => d.name === selectedDriver);
                         if (driver) {
-                          onAssignDriver(order.id, driver.name, driver.phone);
+                          onAssignDriver(order.id, driver.id, driver.name, driver.phone);
                           setSelectedDriver(null);
                         }
                       }}

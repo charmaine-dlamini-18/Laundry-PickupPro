@@ -31,17 +31,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [loadedOrders, setLoadedOrders] = useState<string[]>([]);
 
   const loadMessages = useCallback((orderId: string) => {
-    if (!orderId || loadedOrders.includes(orderId)) return;
+    if (!orderId) return undefined;
 
-    setLoadedOrders((prev) => [...prev, orderId]);
+    if (!loadedOrders.includes(orderId)) {
+      setLoadedOrders((prev) => [...prev, orderId]);
 
-    fetchChatMessages(orderId)
-      .then((records) => {
-        if (records.length > 0) {
-          setMessages((prev) => ({ ...prev, [orderId]: records }));
-        }
-      })
-      .catch(() => undefined);
+      fetchChatMessages(orderId)
+        .then((records) => {
+          if (records.length > 0) {
+            setMessages((prev) => ({
+              ...prev,
+              [orderId]: records,
+            }));
+          }
+        })
+        .catch(() => undefined);
+    }
 
     const unsubscribe = subscribeToOrderMessages(orderId, (incoming) => {
       setMessages((prev) => {
