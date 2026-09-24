@@ -64,6 +64,10 @@ EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
 ```
 
+> **Email confirmation redirect** (`EXPO_PUBLIC_APP_URL`): Confirmation and password-reset emails must link back to your running app. On web this is detected automatically (the current origin is used), but on iOS/Android set `EXPO_PUBLIC_APP_URL` to your deployed web URL so links don't fall back to `localhost`.
+>
+> Also make sure the matching domain is added under Supabase → **Authentication → URL Configuration → Redirect URLs**, otherwise links will keep pointing at `localhost`. The deployed app lives at **https://laundry-pickup-pro.vercel.app/**.
+
 
 ### 3. Database
 

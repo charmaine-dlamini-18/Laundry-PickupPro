@@ -70,6 +70,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    alignSelf: 'stretch',
+    width: '100%',
   },
   primary: {
     backgroundColor: colors.accent,

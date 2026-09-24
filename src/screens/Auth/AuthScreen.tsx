@@ -576,7 +576,7 @@ export default function AuthScreen({ navigation, route }: Props) {
                 style={styles.submitButton}
               />
             ) : (
-              <>
+              <View style={styles.modalActions}>
                 {!!resendNotice && (
                   <Text style={styles.resendNotice}>{resendNotice}</Text>
                 )}
@@ -595,7 +595,7 @@ export default function AuthScreen({ navigation, route }: Props) {
                   }}
                   style={styles.submitButton}
                 />
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -887,6 +887,10 @@ const styles = StyleSheet.create({
   },
   modalIconCircleError: {
     backgroundColor: '#FBE9E9',
+  },
+  modalActions: {
+    alignSelf: 'stretch',
+    width: '100%',
   },
   resendNotice: {
     fontFamily: 'Poppins_500Medium',

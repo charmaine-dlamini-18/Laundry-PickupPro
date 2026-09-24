@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) {
         return;
       }
@@ -153,7 +153,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'SIGNED_IN') {
-        return;
+        const profile = await loadUserProfile(session.user.id);
+
+        if (!mounted || !profile) {
+          return;
+        }
+
+        setUser(profile);
+        setRole(profile.role);
+        setHasSignedInBefore(true);
+        setLastRole(profile.role);
+
+        if (typeof history !== 'undefined') {
+          history.replaceState(null, '', window.location.pathname);
+        }
       }
     });
 
