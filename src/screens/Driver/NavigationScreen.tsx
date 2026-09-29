@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from 'react';
-import {
+import React, { useEffect, useMemo, useState } from 'react';import {
     Alert,
     Linking,
     Platform,
@@ -9,6 +8,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import BookingHeader from '../../components/BookingHeader';
 import { useAuth } from '../../hooks/useAuth';
 import { useDriverOrders } from '../../context/DriverOrdersContext';
-
+import { supabase } from '../../lib/supabase';
 import type { DriverStackParamList } from '../../navigation/DriverNavigator';
 
 const isWeb = Platform.OS === 'web';
@@ -63,9 +64,46 @@ export default function NavigationScreen({
         Poppins_700Bold,
     });
 
-    const [started, setStarted] = useState(false);
-    const [completedIds, setCompletedIds] = useState<string[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
+const [started, setStarted] = useState(false);
+const [completedIds, setCompletedIds] = useState<string[]>([]);
+const [currentIndex, setCurrentIndex] = useState(0);
+
+const [driverLocation, setDriverLocation] =
+    useState<Location.LocationObject | null>(null);
+
+    useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+
+    const startLocationTracking = async () => {
+        const { status } =
+            await Location.requestForegroundPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert(
+                'Location Permission',
+                'Location permission is required to track your position.'
+            );
+            return;
+        }
+
+        subscription = await Location.watchPositionAsync(
+            {
+                accuracy: Location.Accuracy.High,
+                timeInterval: 5000,
+                distanceInterval: 10,
+            },
+            (location) => {
+                setDriverLocation(location);
+            }
+        );
+    };
+
+    startLocationTracking();
+
+    return () => {
+        subscription?.remove();
+    };
+}, []);
 
     const routeStops = useMemo<Stop[]>(
         () =>

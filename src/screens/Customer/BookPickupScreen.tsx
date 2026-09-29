@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchSavedAddresses, type SavedAddress } from '../../services/addressService';
+import { searchAddresses, type AddressSuggestion } from '../../services/addressSearchService';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -146,10 +148,22 @@ export default function BookPickupScreen({ navigation }: Props) {
   const [homeAddressInput, setHomeAddressInput] = useState('');
   const [alert, setAlert] = useState<{ title: string; message: string } | null>(null);
   const [calculatingDistance, setCalculatingDistance] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+const [showSavedAddresses, setShowSavedAddresses] = useState(false);
+const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+const [searchingAddresses, setSearchingAddresses] = useState(false);
 
   useEffect(() => {
-    setHomeAddressInput(booking.pickupType === 'home' ? booking.pickupAddress : '');
-  }, []);
+  setHomeAddressInput(booking.pickupType === 'home' ? booking.pickupAddress : '');
+
+  fetchSavedAddresses()
+    .then((records) => {
+      setSavedAddresses(records);
+    })
+    .catch(() => {
+      setSavedAddresses([]);
+    });
+}, []);
 
   const calculateDistance = useCallback(async () => {
     if (!booking.pickupAddress.trim() || !booking.deliveryAddress.trim()) return;
@@ -174,10 +188,44 @@ export default function BookPickupScreen({ navigation }: Props) {
   };
 
   const handleHomeAddressSubmit = () => {
-    const addr = homeAddressInput.trim();
-    if (!addr) return;
-    updateBooking({ pickupAddress: addr });
-  };
+  const addr = homeAddressInput.trim();
+  if (!addr) return;
+  updateBooking({ pickupAddress: addr });
+  setAddressSuggestions([]);
+};
+
+const handleAddressChange = async (text: string) => {
+  setHomeAddressInput(text);
+
+  if (text.trim().length < 3) {
+    setAddressSuggestions([]);
+    return;
+  }
+
+  setSearchingAddresses(true);
+
+  try {
+    const results = await searchAddresses(text);
+    setAddressSuggestions(results);
+  } catch {
+    setAddressSuggestions([]);
+  } finally {
+    setSearchingAddresses(false);
+  }
+};
+
+const handleSelectAddress = (item: AddressSuggestion) => {
+  setHomeAddressInput(item.formatted);
+  updateBooking({ pickupAddress: item.formatted });
+  setAddressSuggestions([]);
+};
+
+
+  const handleSelectSavedAddress = (item: SavedAddress) => {
+  setHomeAddressInput(item.address);
+  updateBooking({ pickupAddress: item.address });
+  setShowSavedAddresses(false);
+};
 
   const handleSelectLaundromat = (id: string) => {
     updateBooking({ selectedLaundromatId: id });
@@ -444,13 +492,117 @@ export default function BookPickupScreen({ navigation }: Props) {
               <TextInput
                 style={styles.inputCardText}
                 value={homeAddressInput}
-                onChangeText={setHomeAddressInput}
-                onBlur={handleHomeAddressSubmit}
+                onChangeText={handleAddressChange}
+                onSubmitEditing={handleHomeAddressSubmit}
                 placeholder="Enter your address (e.g. 172 Sir Lowry Rd, Woodstock)"
                 placeholderTextColor={TEXT_MUTED}
                 returnKeyType="done"
               />
-            </LinearGradient>
+                        </LinearGradient>
+
+            {searchingAddresses && (
+              <View style={styles.addressSuggestionsBox}>
+                <ActivityIndicator size="small" color={BLUE} />
+                <Text style={styles.addressSearchingText}>
+                  Searching addresses...
+                </Text>
+              </View>
+            )}
+
+            {!searchingAddresses && addressSuggestions.length > 0 && (
+              <View style={styles.addressSuggestionsBox}>
+                {addressSuggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.addressSuggestionItem}
+                    activeOpacity={0.8}
+                    onPress={() => handleSelectAddress(item)}
+                  >
+                    <View style={styles.addressSuggestionIcon}>
+                      <MaterialCommunityIcons
+                        name="map-marker-outline"
+                        size={18}
+                        color={BLUE}
+                      />
+                    </View>
+
+                    <Text style={styles.addressSuggestionText}>
+                      {item.formatted}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.savedAddressButton}
+  activeOpacity={0.8}
+  onPress={() => setShowSavedAddresses(!showSavedAddresses)}
+>
+  <View style={styles.savedAddressButtonIcon}>
+    <MaterialCommunityIcons name="home-map-marker" size={18} color={BLUE} />
+  </View>
+  <View style={styles.savedAddressButtonBody}>
+    <Text style={styles.savedAddressButtonTitle}>Use a saved address</Text>
+    <Text style={styles.savedAddressButtonSubtitle}>
+      Choose from your saved addresses
+    </Text>
+  </View>
+  <MaterialCommunityIcons
+    name={showSavedAddresses ? 'chevron-up' : 'chevron-down'}
+    size={20}
+    color={BLUE}
+  />
+</TouchableOpacity>
+
+{showSavedAddresses && (
+  <View style={styles.savedAddressList}>
+    {savedAddresses.length === 0 ? (
+      <Text style={styles.noSavedAddressText}>
+        You don't have any saved addresses yet.
+      </Text>
+    ) : (
+      savedAddresses.map((item) => (
+        <TouchableOpacity
+          key={item.id}
+          style={[
+            styles.savedAddressItem,
+            item.isDefault && styles.savedAddressItemDefault,
+          ]}
+          activeOpacity={0.8}
+          onPress={() => handleSelectSavedAddress(item)}
+        >
+          <View style={styles.savedAddressItemIcon}>
+            <MaterialCommunityIcons
+              name={item.isDefault ? 'home-variant' : 'map-marker-outline'}
+              size={20}
+              color={item.isDefault ? '#00A85A' : BLUE}
+            />
+          </View>
+
+          <View style={styles.savedAddressItemBody}>
+            <View style={styles.savedAddressItemTop}>
+              <Text style={styles.savedAddressItemLabel}>{item.label}</Text>
+              {item.isDefault && (
+                <Text style={styles.savedAddressDefault}>Default</Text>
+              )}
+            </View>
+
+            <Text style={styles.savedAddressItemText}>
+              {item.address}
+            </Text>
+          </View>
+
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={TEXT_MUTED}
+          />
+        </TouchableOpacity>
+      ))
+    )}
+  </View>
+)}
 
             {booking.pickupAddress.trim() && booking.assignedLaundromat ? (
               <View style={styles.laundromatCard}>
@@ -836,12 +988,20 @@ export default function BookPickupScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: TEAL },
-  scroll: { backgroundColor: '#F3F6FC' },
+  flex: { 
+  flex: 1 
+},
+  safeArea: { 
+  flex: 1, 
+  backgroundColor: TEAL 
+},
+  scroll: { 
+  backgroundColor: '#F3F6FC' 
+},
   container: {
     paddingBottom: 36,
-    ...(isWeb ? { paddingHorizontal: 32, maxWidth: 600, alignSelf: 'center', width: '100%' } : {}),
+    ...(isWeb ? { paddingHorizontal: 32, maxWidth: 600, alignSelf: 'center', width: '100%' 
+    } : {}),
   },
   hero: {
     borderRadius: 28,
@@ -857,8 +1017,11 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
   },
   heroCircleA: {
-    position: 'absolute', width: 180, height: 180, borderRadius: 90,
-    backgroundColor: 'rgba(120, 87, 255, 0.22)', top: -70, right: -50,
+    position: 'absolute', width: 180, height: 180, 
+    borderRadius: 90,
+    backgroundColor: 'rgba(120, 87, 255, 0.22)', 
+    top: -70, 
+    right: -50,
   },
   heroCircleB: {
     position: 'absolute', width: 90, height: 90, borderRadius: 45,
@@ -1136,5 +1299,161 @@ const styles = StyleSheet.create({
   modalCancel: { paddingHorizontal: 18, paddingVertical: 10, marginRight: 8 },
   modalCancelText: { fontFamily: 'Poppins_500Medium', fontSize: 15, color: TEXT_MUTED },
   modalSave: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 12, backgroundColor: TEAL },
-  modalSaveText: { fontFamily: 'Poppins_600SemiBold', fontSize: 15, color: colors.white },
+  modalSaveText: { 
+    fontFamily: 'Poppins_600SemiBold', 
+    fontSize: 15, 
+    color: colors.white 
+  },
+savedAddressButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#F5F8FF',
+  borderWidth: 1,
+  borderColor: '#D9E5FF',
+  borderRadius: 14,
+  padding: 12,
+  marginTop: 10,
+},
+
+savedAddressButtonIcon: {
+  width: 38,
+  height: 38,
+  borderRadius: 12,
+  backgroundColor: '#E4EEFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 10,
+},
+
+savedAddressButtonBody: {
+  flex: 1,
+},
+
+savedAddressButtonTitle: {
+  fontFamily: 'Poppins_600SemiBold',
+  fontSize: 13,
+  color: BLUE,
+},
+
+savedAddressButtonSubtitle: {
+  fontFamily: 'Poppins_400Regular',
+  fontSize: 11,
+  color: TEXT_MUTED,
+  marginTop: 2,
+},
+
+savedAddressList: {
+  backgroundColor: colors.white,
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 14,
+  marginTop: 8,
+  overflow: 'hidden',
+},
+
+savedAddressItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: BORDER,
+},
+
+savedAddressItemDefault: {
+  backgroundColor: '#F6FFF9',
+},
+
+savedAddressItemIcon: {
+  width: 38,
+  height: 38,
+  borderRadius: 12,
+  backgroundColor: '#EAF0FF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 10,
+},
+
+savedAddressItemBody: {
+  flex: 1,
+},
+
+savedAddressItemTop: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+savedAddressItemLabel: {
+  fontFamily: 'Poppins_600SemiBold',
+  fontSize: 13,
+  color: TEXT_DARK,
+},
+
+savedAddressDefault: {
+  fontFamily: 'Poppins_500Medium',
+  fontSize: 9,
+  color: '#00A85A',
+  backgroundColor: '#DDF8E8',
+  paddingHorizontal: 7,
+  paddingVertical: 2,
+  borderRadius: 8,
+  marginLeft: 7,
+},
+
+savedAddressItemText: {
+  fontFamily: 'Poppins_400Regular',
+  fontSize: 11,
+  color: TEXT_MUTED,
+  marginTop: 3,
+},
+
+noSavedAddressText: {
+  fontFamily: 'Poppins_400Regular',
+  fontSize: 12,
+  color: TEXT_MUTED,
+  textAlign: 'center',
+  padding: 18,
+},
+  addressSuggestionsBox: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    marginTop: -4,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+
+  addressSearchingText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: TEXT_MUTED,
+    marginLeft: 8,
+  },
+
+  addressSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+
+  addressSuggestionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#EAF0FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+
+  addressSuggestionText: {
+    flex: 1,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: TEXT_DARK,
+    lineHeight: 18,
+  },
 });
