@@ -29,7 +29,11 @@ import { placeBooking } from '../../services/bookingServices';
 import type { AdminOrder } from '../../context/AdminContext';
 import type { BookingStackParamList } from '../../navigation/BookingNavigator';
 import { colors } from '../../theme/colors';
-import { formatBookingDate, formatMoney, formatTimeWindow } from '../../utils/format';
+import {
+  formatBookingDate,
+  formatMoney,
+  formatTimeWindow,
+} from '../../utils/format';
 
 type Props = NativeStackScreenProps<BookingStackParamList, 'Success'>;
 
@@ -46,10 +50,14 @@ const isWeb = Platform.OS === 'web';
 export default function BookingSuccessScreen({ navigation }: Props) {
   const { booking, resetBooking } = useBooking();
   const { addOrder } = useOrders();
-  const { addOrder: addAdminOrder, refreshOrders: refreshAdminOrders } = useAdmin();
+  const {
+    addOrder: addAdminOrder,
+    refreshOrders: refreshAdminOrders,
+  } = useAdmin();
   const { user } = useAuth();
+
   const [reference, setReference] = useState('');
-  
+
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -59,139 +67,170 @@ export default function BookingSuccessScreen({ navigation }: Props) {
 
   if (!fontsLoaded) return null;
 
-const handleDone = async () => {
-  const orderId = `ord-${Date.now()}`;
-  const now = new Date();
-  const placedAt = now.toLocaleString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const handleDone = async () => {
+    const orderId = `ord-${Date.now()}`;
 
-  const pickupDateStr = formatBookingDate(booking.pickupDate);
-  const pickupTimeStr = formatTimeWindow(booking.pickupTime);
-  const deliveryDateStr = formatBookingDate(booking.deliveryDate);
-  const deliveryTimeStr = formatTimeWindow(booking.deliveryTime);
-  const serviceSubtotal = booking.total - booking.deliveryFee;
+    const now = new Date();
 
-  if (!user) {
-    Alert.alert('Booking not saved', 'You must be signed in to place an order.');
-    return;
-  }
-
-  try {
-    const result = await placeBooking({
-      userId: user.id,
-      customerName: user.name,
-      customerPhone: user.phone ?? '',
-      pickupAddress: booking.pickupAddress,
-      pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
-      deliveryAddress: booking.deliveryAddress,
-      deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
-      instructions: booking.instructions,
-      laundromat: booking.assignedLaundromat?.name,
-      laundromatAddress: booking.assignedLaundromat?.address,
-      bagCount: booking.bagCount,
-      total: booking.total,
-      paymentMethod: booking.paymentMethod,
-      items: [
-        {
-          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
-          quantity: 1,
-          price: serviceSubtotal,
-        },
-      ],
+    const placedAt = now.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
 
-    setReference(result.reference);
+    const pickupDateStr = formatBookingDate(booking.pickupDate);
+    const pickupTimeStr = formatTimeWindow(booking.pickupTime);
+    const deliveryDateStr = formatBookingDate(booking.deliveryDate);
+    const deliveryTimeStr = formatTimeWindow(booking.deliveryTime);
 
-    resetBooking();
-    navigation.getParent()?.navigate('Home');
-    navigation.popToTop();
+    const serviceSubtotal = booking.total - booking.deliveryFee;
 
-    await refreshAdminOrders();
+    if (!user) {
+      Alert.alert(
+        'Booking not saved',
+        'You must be signed in to place an order.'
+      );
+      return;
+    }
 
-    addOrder({
-      id: orderId,
-      reference,
-      service: 'Pickup & Drop Off',
-      status: 'Scheduled',
-      placedAt,
-      pickupAddress: booking.pickupAddress,
-      deliveryAddress: booking.deliveryAddress,
-      pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
-      deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
-      pickupType: booking.pickupType,
-      driver: undefined,
-      driverPhone: undefined,
-      items: [
-        {
-          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
-          quantity: 1,
-          price: serviceSubtotal,
-        },
-      ],
-      deliveryFee: booking.deliveryFee,
-      total: booking.total,
-      paymentMethod: booking.paymentMethod,
-      instructions: booking.instructions,
-      laundromat: booking.assignedLaundromat?.name,
-      laundromatAddress: booking.assignedLaundromat?.address,
-    });
+    try {
+      const result = await placeBooking({
+        userId: user.id,
+        customerName: user.name,
+        customerPhone: user.phone ?? '',
+        pickupAddress: booking.pickupAddress,
+        pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
+        deliveryAddress: booking.deliveryAddress,
+        deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
+        instructions: booking.instructions,
+        laundromat: booking.assignedLaundromat?.name,
+        laundromatAddress: booking.assignedLaundromat?.address,
+        bagCount: booking.bagCount,
+        total: booking.total,
+        paymentMethod: booking.paymentMethod,
+        items: [
+          {
+            name: `${booking.bagCount} ${
+              booking.bagCount === 1 ? 'Bag' : 'Bags'
+            }`,
+            quantity: 1,
+            price: serviceSubtotal,
+          },
+        ],
+      });
 
-    const adminOrder: AdminOrder = {
-      id: `#SUD-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(1000 + Math.random() * 9000))}`,
-      customerName: 'Customer',
-      customerPhone: '',
-      pickupAddress: booking.pickupAddress,
-      deliveryAddress: booking.deliveryAddress,
-      pickupDate: pickupDateStr,
-      pickupTime: pickupTimeStr,
-      driver: '',
-      driverPhone: '',
-      status: 'Pending',
-      placedAt,
-      placedAtISO: now.toISOString(),
-      items: [
-        {
-          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
-          quantity: 1,
-          price: serviceSubtotal,
-        },
-      ],
-      deliveryFee: booking.deliveryFee,
-      paymentMethod: booking.paymentMethod,
-      instructions: booking.instructions,
-      laundromat: booking.assignedLaundromat?.name,
-      laundromatAddress: booking.assignedLaundromat?.address,
-    };
+      setReference(result.reference);
 
-    addAdminOrder(adminOrder);
+      await refreshAdminOrders();
 
-    resetBooking();
-    navigation.getParent()?.navigate('Home');
-    navigation.popToTop();
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : 'Something went wrong.';
-    Alert.alert('Booking not saved', `${message} Please try again.`);
-  }
-};
+      addOrder({
+        id: orderId,
+        reference: result.reference,
+        service: 'Pickup & Drop Off',
+        status: 'Scheduled',
+        placedAt,
+        pickupAddress: booking.pickupAddress,
+        deliveryAddress: booking.deliveryAddress,
+        pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
+        deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
+        pickupType: booking.pickupType,
+        driver: undefined,
+        driverPhone: undefined,
+        items: [
+          {
+            name: `${booking.bagCount} ${
+              booking.bagCount === 1 ? 'Bag' : 'Bags'
+            }`,
+            quantity: 1,
+            price: serviceSubtotal,
+          },
+        ],
+        deliveryFee: booking.deliveryFee,
+        total: booking.total,
+        paymentMethod: booking.paymentMethod,
+        instructions: booking.instructions,
+        laundromat: booking.assignedLaundromat?.name,
+        laundromatAddress: booking.assignedLaundromat?.address,
+      });
+
+      const adminOrder: AdminOrder = {
+        id: `#SUD-${now.getFullYear()}${String(
+          now.getMonth() + 1
+        ).padStart(2, '0')}${String(now.getDate()).padStart(
+          2,
+          '0'
+        )}-${String(Math.floor(1000 + Math.random() * 9000))}`,
+        customerName: user.name,
+        customerPhone: user.phone ?? '',
+        pickupAddress: booking.pickupAddress,
+        deliveryAddress: booking.deliveryAddress,
+        pickupDate: pickupDateStr,
+        pickupTime: pickupTimeStr,
+        driver: '',
+        driverPhone: '',
+        status: 'Pending',
+        placedAt,
+        placedAtISO: now.toISOString(),
+        items: [
+          {
+            name: `${booking.bagCount} ${
+              booking.bagCount === 1 ? 'Bag' : 'Bags'
+            }`,
+            quantity: 1,
+            price: serviceSubtotal,
+          },
+        ],
+        deliveryFee: booking.deliveryFee,
+        paymentMethod: booking.paymentMethod,
+        instructions: booking.instructions,
+        laundromat: booking.assignedLaundromat?.name,
+        laundromatAddress: booking.assignedLaundromat?.address,
+      };
+
+      addAdminOrder(adminOrder);
+
+      resetBooking();
+
+      navigation.getParent()?.navigate('Home');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong.';
+
+      Alert.alert(
+        'Booking not saved',
+        `${message} Please try again.`
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <BookingHeader title="Booking Confirmed" onBack={() => navigation.goBack()} />
+      <BookingHeader
+        title="Booking Confirmed"
+        onBack={() => navigation.goBack()}
+      />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <LinearGradient colors={GRADIENT_CHECK} style={styles.checkCircle}>
-            <MaterialCommunityIcons name="check" size={44} color={colors.white} />
+          <LinearGradient
+            colors={GRADIENT_CHECK}
+            style={styles.checkCircle}
+          >
+            <MaterialCommunityIcons
+              name="check"
+              size={44}
+              color={colors.white}
+            />
           </LinearGradient>
+
           <Text style={styles.title}>Booking Confirmed!</Text>
+
           <Text style={styles.subtitle}>
             Your laundry pickup has been scheduled successfully.
           </Text>
@@ -199,60 +238,111 @@ const handleDone = async () => {
 
         <View style={styles.referenceChip}>
           <View style={styles.referenceIcon}>
-            <MaterialCommunityIcons name="barcode-scan" size={18} color="#0E9AA7" />
+            <MaterialCommunityIcons
+              name="barcode-scan"
+              size={18}
+              color="#0E9AA7"
+            />
           </View>
+
           <View style={styles.referenceBody}>
-            <Text style={styles.referenceLabel}>Booking reference</Text>
-            <Text style={styles.referenceValue}>{reference}</Text>
+            <Text style={styles.referenceLabel}>
+              Booking reference
+            </Text>
+
+            <Text style={styles.referenceValue}>
+              {reference}
+            </Text>
           </View>
         </View>
 
-        <LinearGradient colors={GRADIENT_SUMMARY} style={styles.summaryCard}>
+        <LinearGradient
+          colors={GRADIENT_SUMMARY}
+          style={styles.summaryCard}
+        >
           <View style={styles.summaryHeader}>
-            <MaterialCommunityIcons name="basket-outline" size={20} color={colors.white} />
-            <Text style={styles.summaryHeaderText}>Pickup &amp; Drop Off</Text>
+            <MaterialCommunityIcons
+              name="basket-outline"
+              size={20}
+              color={colors.white}
+            />
+
+            <Text style={styles.summaryHeaderText}>
+              Pickup &amp; Drop Off
+            </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Pickup</Text>
-            <Text style={styles.summaryValue}>{booking.pickupAddress}</Text>
+
+            <Text style={styles.summaryValue}>
+              {booking.pickupAddress}
+            </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Pickup time</Text>
+
             <Text style={styles.summaryValue}>
               {formatBookingDate(booking.pickupDate)} ·{' '}
               {formatTimeWindow(booking.pickupTime)}
             </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery</Text>
-            <Text style={styles.summaryValue}>{booking.deliveryAddress}</Text>
+
+            <Text style={styles.summaryValue}>
+              {booking.deliveryAddress}
+            </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery time</Text>
+
             <Text style={styles.summaryValue}>
               {formatBookingDate(booking.deliveryDate)} ·{' '}
               {formatTimeWindow(booking.deliveryTime)}
             </Text>
           </View>
+
           {booking.assignedLaundromat && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Laundromat</Text>
-              <Text style={styles.summaryValue}>{booking.assignedLaundromat.name}</Text>
+              <Text style={styles.summaryLabel}>
+                Laundromat
+              </Text>
+
+              <Text style={styles.summaryValue}>
+                {booking.assignedLaundromat.name}
+              </Text>
             </View>
           )}
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Payment</Text>
-            <Text style={styles.summaryValue}>{booking.paymentMethod}</Text>
+
+            <Text style={styles.summaryValue}>
+              {booking.paymentMethod}
+            </Text>
           </View>
+
           {!!booking.instructions && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Notes</Text>
-              <Text style={styles.summaryValue}>{booking.instructions}</Text>
+
+              <Text style={styles.summaryValue}>
+                {booking.instructions}
+              </Text>
             </View>
           )}
+
           <View style={styles.summaryDivider} />
+
           <View style={styles.summaryTotalRow}>
-            <Text style={styles.summaryTotalLabel}>Total</Text>
+            <Text style={styles.summaryTotalLabel}>
+              Total
+            </Text>
+
             <Text style={styles.summaryTotalValue}>
               {formatMoney(booking.total)}
             </Text>
@@ -260,9 +350,15 @@ const handleDone = async () => {
         </LinearGradient>
 
         <View style={styles.infoRow}>
-          <MaterialCommunityIcons name="email-outline" size={18} color="#0E9AA7" />
+          <MaterialCommunityIcons
+            name="email-outline"
+            size={18}
+            color="#0E9AA7"
+          />
+
           <Text style={styles.infoText}>
-            A confirmation email with these details has been sent to you.
+            A confirmation email with these details has been sent
+            to you.
           </Text>
         </View>
 
@@ -271,15 +367,27 @@ const handleDone = async () => {
           activeOpacity={0.9}
           onPress={handleDone}
         >
-          <LinearGradient colors={GRADIENT_NEXT} style={styles.doneButton}>
+          <LinearGradient
+            colors={GRADIENT_NEXT}
+            style={styles.doneButton}
+          >
             <MaterialCommunityIcons
               name="rocket-launch-outline"
               size={18}
               color={colors.white}
               style={styles.doneButtonIcon}
             />
-            <Text style={styles.doneButtonText}>Done</Text>
-            <MaterialCommunityIcons name="check" size={18} color={colors.white} />
+
+            <Text style={styles.doneButtonText}>
+              Done
+            </Text>
+
+            <MaterialCommunityIcons
+              name="check"
+              size={18}
+              color={colors.white}
+            />
+
             <View style={styles.doneButtonShine} />
           </LinearGradient>
         </TouchableOpacity>
@@ -293,19 +401,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+
   scroll: {
     backgroundColor: '#F7F9FB',
   },
+
   container: {
     paddingHorizontal: isWeb ? 32 : 20,
     paddingTop: 32,
     paddingBottom: 24,
-    ...(isWeb ? { maxWidth: 600, alignSelf: 'center', width: '100%' } : {}),
+    ...(isWeb
+      ? {
+          maxWidth: 600,
+          alignSelf: 'center',
+          width: '100%',
+        }
+      : {}),
   },
+
   hero: {
     alignItems: 'center',
     marginBottom: 24,
   },
+
   checkCircle: {
     width: 92,
     height: 92,
@@ -319,12 +437,14 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     marginBottom: 20,
   },
+
   title: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 24,
     color: TEAL,
     textAlign: 'center',
   },
+
   subtitle: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 13,
@@ -333,6 +453,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
+
   referenceChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,6 +466,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 22,
   },
+
   referenceIcon: {
     width: 36,
     height: 36,
@@ -354,15 +476,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
+
   referenceBody: {
     alignItems: 'flex-start',
   },
+
   referenceLabel: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 10,
     color: TEXT_MUTED,
     textTransform: 'uppercase',
   },
+
   referenceValue: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 16,
@@ -370,6 +495,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 1,
   },
+
   summaryCard: {
     borderRadius: 20,
     padding: 18,
@@ -379,27 +505,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 12,
   },
+
   summaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 14,
   },
+
   summaryHeaderText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
     color: colors.white,
     marginLeft: 8,
   },
+
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
+
   summaryLabel: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.75)',
   },
+
   summaryValue: {
     flex: 1,
     fontFamily: 'Poppins_500Medium',
@@ -408,27 +539,32 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginLeft: 16,
   },
+
   summaryDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     marginVertical: 6,
   },
+
   summaryTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
   },
+
   summaryTotalLabel: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
     color: colors.white,
   },
+
   summaryTotalValue: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 22,
     color: colors.white,
   },
+
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -438,6 +574,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 20,
   },
+
   infoText: {
     flex: 1,
     fontFamily: 'Poppins_400Regular',
@@ -446,10 +583,12 @@ const styles = StyleSheet.create({
     color: '#4A5C64',
     marginLeft: 10,
   },
+
   doneButtonTouch: {
     borderRadius: 18,
     marginTop: 24,
   },
+
   doneButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -463,9 +602,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
+
   doneButtonIcon: {
     marginRight: 8,
   },
+
   doneButtonShine: {
     position: 'absolute',
     top: -30,
@@ -476,6 +617,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
     transform: [{ rotate: '20deg' }],
   },
+
   doneButtonText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 17,

@@ -75,6 +75,10 @@ const [driverLocation, setDriverLocation] =
     let subscription: Location.LocationSubscription | null = null;
 
     const startLocationTracking = async () => {
+        if (!user?.id) {
+            return;
+        }
+
         const { status } =
             await Location.requestForegroundPermissionsAsync();
 
@@ -92,8 +96,26 @@ const [driverLocation, setDriverLocation] =
                 timeInterval: 5000,
                 distanceInterval: 10,
             },
-            (location) => {
+            async (location) => {
                 setDriverLocation(location);
+
+                const { error } = await supabase
+                    .from('driver_locations')
+                    .upsert(
+                        {
+                            driver_id: user.id,
+                            latitude: location.coords.latitude,
+                            longitude: location.coords.longitude,
+                            updated_at: new Date().toISOString(),
+                        },
+                        {
+                            onConflict: 'driver_id',
+                        }
+                    );
+
+                if (error) {
+                    console.log('Driver location update error:', error);
+                }
             }
         );
     };
@@ -103,7 +125,7 @@ const [driverLocation, setDriverLocation] =
     return () => {
         subscription?.remove();
     };
-}, []);
+}, [user?.id]);
 
     const routeStops = useMemo<Stop[]>(
         () =>

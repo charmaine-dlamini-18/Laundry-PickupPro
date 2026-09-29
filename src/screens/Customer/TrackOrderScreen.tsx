@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import MapView, { Marker } from 'react-native-maps';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -23,10 +24,12 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import { useOrders } from '../../context/OrdersContext';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { CustomerTabNavigation, CustomerTabParamList } from '../../navigation/types';
 import { ORDER_STEPS, isOrderActive, orderStepIndex, type OrderStatus } from '../../data/orders';
 import { formatMoney } from '../../utils/format';
+
 
 type TrackRoute = RouteProp<CustomerTabParamList, 'Track'>;
 
@@ -104,11 +107,17 @@ export default function TrackOrderScreen() {
     route.params?.order?.id ?? activeOrders[0]?.id ?? null
   );
 
+  const [driverLocation, setDriverLocation] = useState<{
+  latitude: number;
+  longitude: number;
+} | null>(null);
+
   useEffect(() => {
     if (route.params?.order?.id) {
       setSelectedId(route.params.order.id);
     }
   }, [route.params]);
+
 
   useEffect(() => {
     if (!selectedId && activeOrders.length > 0) {
@@ -118,6 +127,75 @@ export default function TrackOrderScreen() {
 
   const order = orders.find((o) => o.id === selectedId) ?? activeOrders[0];
 
+
+  useEffect(() => {
+  if (!order?.id) {
+    setDriverLocation(null);
+    return;
+  }
+
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+
+  const loadDriverLocation = async () => {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('driver_assignments')
+      .select('driver_id')
+      .eq('order_id', order.id)
+      .maybeSingle();
+
+    if (assignmentError || !assignment?.driver_id) {
+      setDriverLocation(null);
+      return;
+    }
+
+    const driverId = assignment.driver_id;
+
+    const { data: location, error: locationError } = await supabase
+      .from('driver_locations')
+      .select('latitude, longitude')
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    if (!locationError && location) {
+      setDriverLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+    }
+
+    channel = supabase
+      .channel(`driver-location-${driverId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'driver_locations',
+          filter: `driver_id=eq.${driverId}`,
+        },
+        (payload) => {
+          const updatedLocation = payload.new as {
+            latitude: number;
+            longitude: number;
+          };
+
+          setDriverLocation({
+            latitude: updatedLocation.latitude,
+            longitude: updatedLocation.longitude,
+          });
+        }
+      )
+      .subscribe();
+  };
+
+  loadDriverLocation();
+
+  return () => {
+    if (channel) {
+      supabase.removeChannel(channel);
+    }
+  };
+}, [order?.id]);
   if (!fontsLoaded) return null;
 
   if (!order) {
@@ -307,14 +385,43 @@ export default function TrackOrderScreen() {
         <TouchableOpacity activeOpacity={0.92} onPress={openMaps}>
           <View style={styles.mapCard}>
             <View style={styles.mapCanvas}>
-              <Image
-                source={require('../../../assets/delivery-map.png')}
-                style={styles.mapImage}
-                resizeMode="cover"
-              />
-              <View style={styles.mapPin}>
-                <MaterialCommunityIcons name="map-marker" size={44} color={AMBER} />
-              </View>
+  <MapView
+    style={styles.map}
+    initialRegion={{
+      latitude: driverLocation?.latitude ?? lat,
+      longitude: driverLocation?.longitude ?? lng,
+      latitudeDelta: 0.03,
+      longitudeDelta: 0.03,
+    }}
+  >
+    {driverLocation && (
+      <Marker
+        coordinate={{
+          latitude: driverLocation.latitude,
+          longitude: driverLocation.longitude,
+        }}
+        title="Your driver"
+        description={order.driver ?? 'Driver'}
+      >
+        <View style={styles.driverMapMarker}>
+          <MaterialCommunityIcons
+            name="truck-fast"
+            size={22}
+            color={WHITE}
+          />
+        </View>
+      </Marker>
+    )}
+
+    <Marker
+      coordinate={{
+        latitude: lat,
+        longitude: lng,
+      }}
+      title="Delivery location"
+      description={order.deliveryAddress}
+    />
+  </MapView>
               <LinearGradient colors={GRADIENT_VIBRANT} style={styles.mapAddressTag}>
                 <MaterialCommunityIcons name="map-marker" size={15} color={WHITE} />
                 <Text style={styles.mapAddressText} numberOfLines={1}>
@@ -660,6 +767,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E8EEF7',
   },
+map: {
+  width: '100%',
+  height: '100%',
+},
+
+driverMapMarker: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: PRIMARY,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: WHITE,
+  elevation: 5,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+},
   mapImage: {
     position: 'absolute',
     top: 0,

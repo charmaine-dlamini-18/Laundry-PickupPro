@@ -152,8 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (event === 'SIGNED_IN') {
-        const profile = await loadUserProfile(session.user.id);
+      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {        const profile = await loadUserProfile(session.user.id);
 
         if (!mounted || !profile) {
           return;

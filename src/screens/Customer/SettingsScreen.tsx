@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Platform,
@@ -26,7 +25,6 @@ import BookingHeader from '../../components/BookingHeader';
 import { useAuth } from '../../hooks/useAuth';
 import type { CustomerStackParamList } from '../../navigation/types';
 import { ROLE_LABELS } from '../../types';
-import i18n from '../../i18n';
 
 type Props = NativeStackScreenProps<CustomerStackParamList, 'Settings'>;
 
@@ -49,60 +47,61 @@ const BORDER = '#E8ECF1';
 const WHITE = '#FFFFFF';
 const DANGER = '#E5484D';
 const SECTION = '#0E7A86';
+
 const GRADIENT_RED = ['#FF7A70', '#E5484D'] as const;
 
 const isWeb = Platform.OS === 'web';
 
 const toggleRows: ToggleRow[] = [
   {
-    label: 'pushNotifications',
-    hint: 'orderStatusReminders',
+    label: 'Push Notifications',
+    hint: 'Order status reminders',
     icon: 'bell-outline',
     tint: '#E4EEFF',
     color: '#2E6BFF',
     key: 'push',
   },
   {
-    label: 'emailNotifications',
-    hint: 'receiptsConfirmations',
+    label: 'Email Notifications',
+    hint: 'Receipts and confirmations',
     icon: 'email-outline',
     tint: '#EFEBFF',
     color: '#7857FF',
     key: 'email',
   },
   {
-    label: 'smsUpdates',
-    hint: 'deliveryTimeUpdates',
+    label: 'SMS Updates',
+    hint: 'Delivery time updates',
     icon: 'message-text-outline',
     tint: '#D6F0F4',
     color: '#0E9AA7',
     key: 'sms',
   },
   {
-    label: 'locationServices',
-    hint: 'fasterPickupDropoff',
+    label: 'Location Services',
+    hint: 'Faster pickup and drop-off',
     icon: 'map-marker-radius-outline',
     tint: '#DDF8E8',
     color: '#00A85A',
     key: 'location',
   },
 ];
+
 export default function SettingsScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
-  const { t } = useTranslation();
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+
   const [prefs, setPrefs] = useState({
     push: true,
     email: true,
     sms: false,
     location: true,
-    
   });
 
   if (!fontsLoaded) return null;
@@ -112,18 +111,35 @@ export default function SettingsScreen({ navigation }: Props) {
   const roleLabel = user?.role ? ROLE_LABELS[user.role] : 'Customer';
 
   const toggle = (key: keyof typeof prefs) =>
-    setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
+    setPrefs((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
 
   const confirmLogout = () => {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: signOut },
-    ]);
+    Alert.alert(
+      'Log out',
+      'Are you sure you want to log out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Log out',
+          style: 'destructive',
+          onPress: signOut,
+        },
+      ]
+    );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <BookingHeader title={t('settings')} onBack={() => navigation.goBack()} />
+      <BookingHeader
+        title="Settings"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -132,192 +148,189 @@ export default function SettingsScreen({ navigation }: Props) {
       >
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>
+              {displayName.charAt(0).toUpperCase()}
+            </Text>
           </View>
+
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.email} numberOfLines={1}>
+            <Text style={styles.name}>
+              {displayName}
+            </Text>
+
+            <Text
+              style={styles.email}
+              numberOfLines={1}
+            >
               {displayEmail}
             </Text>
-            <Text style={styles.role}>{roleLabel}</Text>
+
+            <Text style={styles.role}>
+              {roleLabel}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>{t('notifications')}</Text>
+        <Text style={styles.sectionTitle}>
+          Notifications
+        </Text>
+
         <View style={styles.card}>
           {toggleRows.map((row, index) => (
             <View
               key={row.key}
-              style={[styles.row, index === toggleRows.length - 1 && styles.rowLast]}
+              style={[
+                styles.row,
+                index === toggleRows.length - 1 &&
+                  styles.rowLast,
+              ]}
             >
-              <View style={[styles.rowIcon, { backgroundColor: row.tint }]}>
-                <MaterialCommunityIcons name={row.icon} size={20} color={row.color} />
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: row.tint },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={row.icon}
+                  size={20}
+                  color={row.color}
+                />
               </View>
+
               <View style={styles.rowBody}>
-                <Text style={styles.rowLabel}>{t(row.label)}</Text>
-                <Text style={styles.rowHint}>{t(row.hint)}</Text>
-               
+                <Text style={styles.rowLabel}>
+                  {row.label}
+                </Text>
+
+                <Text style={styles.rowHint}>
+                  {row.hint}
+                </Text>
               </View>
+
               <Switch
                 value={prefs[row.key]}
                 onValueChange={() => toggle(row.key)}
-                trackColor={{ false: '#D5DCE3', true: '#0E9AA7' }}
-                thumbColor={prefs[row.key] ? '#FFFFFF' : '#F5F7FA'}
+                trackColor={{
+                  false: '#D5DCE3',
+                  true: '#0E9AA7',
+                }}
+                thumbColor={
+                  prefs[row.key]
+                    ? '#FFFFFF'
+                    : '#F5F7FA'
+                }
               />
             </View>
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>{t('language')}</Text>
-<View style={styles.card}>
-  <TouchableOpacity
-    style={[styles.row, styles.rowLast]}
-    onPress={() => {
-      Alert.alert('Select Language', 'Choose your preferred language', [
-        {
-          text: 'English',
-          onPress: () => {
-            setSelectedLanguage('en');
-            i18n.changeLanguage('en');
-          },
-        },
-        {
-          text: 'Afrikaans',
-          onPress: () => {
-            setSelectedLanguage('af');
-            i18n.changeLanguage('af');
-          },
-        },
-        {
-          text: 'isiXhosa',
-          onPress: () => {
-            setSelectedLanguage('xh');
-            i18n.changeLanguage('xh');
-          },
-        },
-        {
-          text: 'isiZulu',
-          onPress: () => {
-            setSelectedLanguage('zu');
-            i18n.changeLanguage('zu');
-          },
-        },
-        {
-          text: 'Sepedi',
-          onPress: () => {
-            setSelectedLanguage('nso');
-            i18n.changeLanguage('nso');
-          },
-        },
-        {
-          text: 'Sesotho',
-          onPress: () => {
-            setSelectedLanguage('st');
-            i18n.changeLanguage('st');
-          },
-        },
-        {
-          text: 'Setswana',
-          onPress: () => {
-            setSelectedLanguage('tn');
-            i18n.changeLanguage('tn');
-          },
-        },
-        {
-          text: 'siSwati',
-          onPress: () => {
-            setSelectedLanguage('ss');
-            i18n.changeLanguage('ss');
-          },
-        },
-        {
-          text: 'Tshivenda',
-          onPress: () => {
-            setSelectedLanguage('ve');
-            i18n.changeLanguage('ve');
-          },
-        },
-        {
-          text: 'itsonga',
-          onPress: () => {
-            setSelectedLanguage('ts');
-            i18n.changeLanguage('ts');
-          },
-        },
-        {
-          text: 'isiNdebele',
-          onPress: () => {
-            setSelectedLanguage('nr');
-            i18n.changeLanguage('nr');
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]);
-    }}
-  >
-    <View style={[styles.rowIcon, { backgroundColor: '#D6F0F4' }]}>
-      <MaterialCommunityIcons name="translate" size={20} color={TEAL} />
-    </View>
+        <Text style={styles.sectionTitle}>
+          Account
+        </Text>
 
-    <View style={styles.rowBody}>
-      <Text style={styles.rowLabel}>Language</Text>
-      <Text style={styles.rowHint}>
-        {selectedLanguage === 'en' ? 'English' : selectedLanguage}
-      </Text>
-    </View>
-
-    <MaterialCommunityIcons
-      name="chevron-right"
-      size={20}
-      color={TEXT_MUTED}
-    />
-  </TouchableOpacity>
-</View>
-
-
-        <Text style={styles.sectionTitle}>{t('account')}</Text>
         <View style={styles.card}>
           <TouchableOpacity
             style={styles.row}
             onPress={() =>
-              Alert.alert('Change password', 'A reset link will be sent to your email.')
+              Alert.alert(
+                'Change password',
+                'A reset link will be sent to your email.'
+              )
             }
           >
-            <View style={[styles.rowIcon, { backgroundColor: '#FFF0B8' }]}>
-              <MaterialCommunityIcons name="lock-reset" size={20} color="#E8960C" />
+            <View
+              style={[
+                styles.rowIcon,
+                { backgroundColor: '#FFF0B8' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="lock-reset"
+                size={20}
+                color="#E8960C"
+              />
             </View>
+
             <View style={styles.rowBody}>
-              <Text style={styles.rowLabel}>Change password</Text>
-              <Text style={styles.rowHint}>Update your account password</Text>
+              <Text style={styles.rowLabel}>
+                Change password
+              </Text>
+
+              <Text style={styles.rowHint}>
+                Update your account password
+              </Text>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={TEXT_MUTED} />
+
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={TEXT_MUTED}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.row, styles.rowLast]}
+            style={[
+              styles.row,
+              styles.rowLast,
+            ]}
             onPress={() =>
-              Alert.alert('Privacy & Security', 'Your data is encrypted and never shared.')
+              Alert.alert(
+                'Privacy & Security',
+                'Your data is encrypted and never shared.'
+              )
             }
           >
-            <View style={[styles.rowIcon, { backgroundColor: '#FCE7F3' }]}>
-              <MaterialCommunityIcons name="shield-check-outline" size={20} color="#EC5E9B" />
+            <View
+              style={[
+                styles.rowIcon,
+                { backgroundColor: '#FCE7F3' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="shield-check-outline"
+                size={20}
+                color="#EC5E9B"
+              />
             </View>
+
             <View style={styles.rowBody}>
-              <Text style={styles.rowLabel}>Privacy &amp; Security</Text>
-              <Text style={styles.rowHint}>Manage your privacy preferences</Text>
+              <Text style={styles.rowLabel}>
+                Privacy & Security
+              </Text>
+
+              <Text style={styles.rowHint}>
+                Manage your privacy preferences
+              </Text>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={TEXT_MUTED} />
+
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={TEXT_MUTED}
+            />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity activeOpacity={0.9} onPress={confirmLogout}>
-          <LinearGradient colors={GRADIENT_RED} style={styles.logoutButton}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={confirmLogout}
+        >
+          <LinearGradient
+            colors={GRADIENT_RED}
+            style={styles.logoutButton}
+          >
             <View style={styles.shine} />
-            <MaterialCommunityIcons name="logout" size={20} color={WHITE} />
-            <Text style={styles.logoutButtonText}>Log out</Text>
+
+            <MaterialCommunityIcons
+              name="logout"
+              size={20}
+              color={WHITE}
+            />
+
+            <Text style={styles.logoutButtonText}>
+              Log out
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
@@ -330,15 +343,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: WHITE,
   },
+
   scroll: {
     backgroundColor: '#F7F9FB',
   },
+
   container: {
     paddingHorizontal: isWeb ? 32 : 20,
     paddingTop: 8,
     paddingBottom: 40,
-    ...(isWeb ? { maxWidth: 600, alignSelf: 'center', width: '100%' } : {}),
+    ...(isWeb
+      ? {
+          maxWidth: 600,
+          alignSelf: 'center',
+          width: '100%',
+        }
+      : {}),
   },
+
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -349,11 +371,15 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 22,
     shadowColor: '#1F2933',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 2,
   },
+
   avatar: {
     width: 56,
     height: 56,
@@ -363,37 +389,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
+
   avatarText: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 22,
     color: WHITE,
   },
+
   profileInfo: {
     flex: 1,
   },
+
   name: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
     color: TEXT_DARK,
   },
+
   email: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 12,
     color: TEXT_MUTED,
     marginTop: 2,
   },
+
   role: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 11,
     color: TEAL,
     marginTop: 2,
   },
+
   sectionTitle: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
     color: SECTION,
     marginBottom: 10,
   },
+
   card: {
     backgroundColor: WHITE,
     borderRadius: 18,
@@ -402,6 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
     overflow: 'hidden',
   },
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -410,9 +444,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F3F4',
   },
+
   rowLast: {
     borderBottomWidth: 0,
   },
+
   rowIcon: {
     width: 38,
     height: 38,
@@ -421,20 +457,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+
   rowBody: {
     flex: 1,
   },
+
   rowLabel: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 14,
     color: TEXT_DARK,
   },
+
   rowHint: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
     color: TEXT_MUTED,
     marginTop: 1,
   },
+
   logoutButton: {
     height: 54,
     borderRadius: 16,
@@ -444,16 +484,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     elevation: 3,
     shadowColor: DANGER,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
     shadowOpacity: 0.22,
     shadowRadius: 10,
   },
+
   logoutButtonText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
     color: WHITE,
     marginLeft: 8,
   },
+
   shine: {
     position: 'absolute',
     top: -30,

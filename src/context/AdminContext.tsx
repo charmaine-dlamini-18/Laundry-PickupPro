@@ -9,6 +9,7 @@ import React, {
 
 import {
   listDriverOrders,
+  deleteAdminCustomer,
   rowsToAdminOrders,
   assignDriverToBooking,
   updateBookingStatus,
@@ -528,9 +529,13 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const deleteCustomer = useCallback((id: string) => {
-    setCustomers((prev) => prev.filter((customer) => customer.id !== id));
-  }, []);
+  const deleteCustomer = useCallback(async (id: string) => {
+  await deleteAdminCustomer(id);
+
+  setCustomers((prev) =>
+    prev.filter((customer) => customer.id !== id)
+  );
+}, []);
 
   const addDriver = useCallback((driver: AdminDriver) => {
     setDrivers((prev) => [driver, ...prev]);
