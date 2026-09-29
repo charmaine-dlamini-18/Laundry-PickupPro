@@ -3,7 +3,6 @@ import type { CustomerOrder, OrderStatus } from '../data/orders';
 
 export type BookingPlacement = {
   userId: string;
-  reference: string;
   customerName: string;
   customerPhone: string;
   pickupAddress: string;
@@ -21,7 +20,7 @@ export type BookingPlacement = {
 
 export async function placeBooking(
   booking: BookingPlacement
-): Promise<{ pickupLegId: string; deliveryLegId: string }> {
+): Promise<{ pickupLegId: string; deliveryLegId: string; reference: string }> {
   const items = (booking.items ?? []).map((item) => ({
     name: item.name,
     quantity: item.quantity,
@@ -29,7 +28,6 @@ export async function placeBooking(
   }));
 
   const { data, error } = await supabase.rpc('create_booking', {
-    p_reference: booking.reference,
     p_customer_name: booking.customerName,
     p_customer_phone: booking.customerPhone,
     p_pickup_address: booking.pickupAddress,
@@ -52,11 +50,13 @@ export async function placeBooking(
   const rows = (data ?? []) as {
     pickup_leg_id?: string;
     delivery_leg_id?: string;
+    booking_reference?: string;
   }[];
 
   return {
     pickupLegId: rows[0]?.pickup_leg_id ?? '',
     deliveryLegId: rows[0]?.delivery_leg_id ?? '',
+    reference: rows[0]?.booking_reference ?? '',
   };
 }
 

@@ -48,9 +48,8 @@ export default function BookingSuccessScreen({ navigation }: Props) {
   const { addOrder } = useOrders();
   const { addOrder: addAdminOrder, refreshOrders: refreshAdminOrders } = useAdmin();
   const { user } = useAuth();
-  const [reference] = useState(
-    () => `LPP-${Math.floor(100000 + Math.random() * 900000)}`
-  );
+  const [reference, setReference] = useState('');
+  
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -60,53 +59,59 @@ export default function BookingSuccessScreen({ navigation }: Props) {
 
   if (!fontsLoaded) return null;
 
-  const handleDone = () => {
-    const orderId = `ord-${Date.now()}`;
-    const now = new Date();
-    const placedAt = now.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const pickupDateStr = formatBookingDate(booking.pickupDate);
-    const pickupTimeStr = formatTimeWindow(booking.pickupTime);
-    const deliveryDateStr = formatBookingDate(booking.deliveryDate);
-    const deliveryTimeStr = formatTimeWindow(booking.deliveryTime);
-    const serviceSubtotal = booking.total - booking.deliveryFee;
+const handleDone = async () => {
+  const orderId = `ord-${Date.now()}`;
+  const now = new Date();
+  const placedAt = now.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
-    if (user) {
-      placeBooking({
-        userId: user.id,
-        reference,
-        customerName: user.name,
-        customerPhone: user.phone ?? '',
-        pickupAddress: booking.pickupAddress,
-        pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
-        deliveryAddress: booking.deliveryAddress,
-        deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
-        instructions: booking.instructions,
-        laundromat: booking.assignedLaundromat?.name,
-        laundromatAddress: booking.assignedLaundromat?.address,
-        bagCount: booking.bagCount,
-        total: booking.total,
-        paymentMethod: booking.paymentMethod,
-        items: [
-          {
-            name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
-            quantity: 1,
-            price: serviceSubtotal,
-          },
-        ],
-      })
-        .then(() => refreshAdminOrders())
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : 'Something went wrong.';
-          Alert.alert('Booking not saved', `${message} Please try again.`);
-        });
-    }
+  const pickupDateStr = formatBookingDate(booking.pickupDate);
+  const pickupTimeStr = formatTimeWindow(booking.pickupTime);
+  const deliveryDateStr = formatBookingDate(booking.deliveryDate);
+  const deliveryTimeStr = formatTimeWindow(booking.deliveryTime);
+  const serviceSubtotal = booking.total - booking.deliveryFee;
+
+  if (!user) {
+    Alert.alert('Booking not saved', 'You must be signed in to place an order.');
+    return;
+  }
+
+  try {
+    const result = await placeBooking({
+      userId: user.id,
+      customerName: user.name,
+      customerPhone: user.phone ?? '',
+      pickupAddress: booking.pickupAddress,
+      pickupWindow: `${pickupDateStr} · ${pickupTimeStr}`,
+      deliveryAddress: booking.deliveryAddress,
+      deliveryWindow: `${deliveryDateStr} · ${deliveryTimeStr}`,
+      instructions: booking.instructions,
+      laundromat: booking.assignedLaundromat?.name,
+      laundromatAddress: booking.assignedLaundromat?.address,
+      bagCount: booking.bagCount,
+      total: booking.total,
+      paymentMethod: booking.paymentMethod,
+      items: [
+        {
+          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
+          quantity: 1,
+          price: serviceSubtotal,
+        },
+      ],
+    });
+
+    setReference(result.reference);
+
+    resetBooking();
+    navigation.getParent()?.navigate('Home');
+    navigation.popToTop();
+
+    await refreshAdminOrders();
 
     addOrder({
       id: orderId,
@@ -121,7 +126,13 @@ export default function BookingSuccessScreen({ navigation }: Props) {
       pickupType: booking.pickupType,
       driver: undefined,
       driverPhone: undefined,
-      items: [{ name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`, quantity: 1, price: serviceSubtotal }],
+      items: [
+        {
+          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
+          quantity: 1,
+          price: serviceSubtotal,
+        },
+      ],
       deliveryFee: booking.deliveryFee,
       total: booking.total,
       paymentMethod: booking.paymentMethod,
@@ -143,20 +154,31 @@ export default function BookingSuccessScreen({ navigation }: Props) {
       status: 'Pending',
       placedAt,
       placedAtISO: now.toISOString(),
-      items: [{ name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`, quantity: 1, price: serviceSubtotal }],
+      items: [
+        {
+          name: `${booking.bagCount} ${booking.bagCount === 1 ? 'Bag' : 'Bags'}`,
+          quantity: 1,
+          price: serviceSubtotal,
+        },
+      ],
       deliveryFee: booking.deliveryFee,
       paymentMethod: booking.paymentMethod,
       instructions: booking.instructions,
       laundromat: booking.assignedLaundromat?.name,
       laundromatAddress: booking.assignedLaundromat?.address,
     };
+
     addAdminOrder(adminOrder);
 
     resetBooking();
     navigation.getParent()?.navigate('Home');
     navigation.popToTop();
-  };
-
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Something went wrong.';
+    Alert.alert('Booking not saved', `${message} Please try again.`);
+  }
+};
   return (
     <SafeAreaView style={styles.safeArea}>
       <BookingHeader title="Booking Confirmed" onBack={() => navigation.goBack()} />

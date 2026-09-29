@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Platform,
@@ -25,6 +26,7 @@ import BookingHeader from '../../components/BookingHeader';
 import { useAuth } from '../../hooks/useAuth';
 import type { CustomerStackParamList } from '../../navigation/types';
 import { ROLE_LABELS } from '../../types';
+import i18n from '../../i18n';
 
 type Props = NativeStackScreenProps<CustomerStackParamList, 'Settings'>;
 
@@ -53,41 +55,42 @@ const isWeb = Platform.OS === 'web';
 
 const toggleRows: ToggleRow[] = [
   {
-    label: 'Push notifications',
-    hint: 'Order status and reminders',
+    label: 'pushNotifications',
+    hint: 'orderStatusReminders',
     icon: 'bell-outline',
     tint: '#E4EEFF',
     color: '#2E6BFF',
     key: 'push',
   },
   {
-    label: 'Email notifications',
-    hint: 'Receipts and confirmations',
+    label: 'emailNotifications',
+    hint: 'receiptsConfirmations',
     icon: 'email-outline',
     tint: '#EFEBFF',
     color: '#7857FF',
     key: 'email',
   },
   {
-    label: 'SMS updates',
-    hint: 'Delivery time updates',
+    label: 'smsUpdates',
+    hint: 'deliveryTimeUpdates',
     icon: 'message-text-outline',
     tint: '#D6F0F4',
     color: '#0E9AA7',
     key: 'sms',
   },
   {
-    label: 'Location services',
-    hint: 'Faster pickup & drop-off',
+    label: 'locationServices',
+    hint: 'fasterPickupDropoff',
     icon: 'map-marker-radius-outline',
     tint: '#DDF8E8',
     color: '#00A85A',
     key: 'location',
   },
 ];
-
 export default function SettingsScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
+  const { t } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -99,6 +102,7 @@ export default function SettingsScreen({ navigation }: Props) {
     email: true,
     sms: false,
     location: true,
+    
   });
 
   if (!fontsLoaded) return null;
@@ -119,7 +123,7 @@ export default function SettingsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <BookingHeader title="Settings" onBack={() => navigation.goBack()} />
+      <BookingHeader title={t('settings')} onBack={() => navigation.goBack()} />
 
       <ScrollView
         style={styles.scroll}
@@ -139,7 +143,7 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Notifications</Text>
+        <Text style={styles.sectionTitle}>{t('notifications')}</Text>
         <View style={styles.card}>
           {toggleRows.map((row, index) => (
             <View
@@ -150,8 +154,9 @@ export default function SettingsScreen({ navigation }: Props) {
                 <MaterialCommunityIcons name={row.icon} size={20} color={row.color} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowLabel}>{row.label}</Text>
-                <Text style={styles.rowHint}>{row.hint}</Text>
+                <Text style={styles.rowLabel}>{t(row.label)}</Text>
+                <Text style={styles.rowHint}>{t(row.hint)}</Text>
+               
               </View>
               <Switch
                 value={prefs[row.key]}
@@ -163,7 +168,117 @@ export default function SettingsScreen({ navigation }: Props) {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle}>{t('language')}</Text>
+<View style={styles.card}>
+  <TouchableOpacity
+    style={[styles.row, styles.rowLast]}
+    onPress={() => {
+      Alert.alert('Select Language', 'Choose your preferred language', [
+        {
+          text: 'English',
+          onPress: () => {
+            setSelectedLanguage('en');
+            i18n.changeLanguage('en');
+          },
+        },
+        {
+          text: 'Afrikaans',
+          onPress: () => {
+            setSelectedLanguage('af');
+            i18n.changeLanguage('af');
+          },
+        },
+        {
+          text: 'isiXhosa',
+          onPress: () => {
+            setSelectedLanguage('xh');
+            i18n.changeLanguage('xh');
+          },
+        },
+        {
+          text: 'isiZulu',
+          onPress: () => {
+            setSelectedLanguage('zu');
+            i18n.changeLanguage('zu');
+          },
+        },
+        {
+          text: 'Sepedi',
+          onPress: () => {
+            setSelectedLanguage('nso');
+            i18n.changeLanguage('nso');
+          },
+        },
+        {
+          text: 'Sesotho',
+          onPress: () => {
+            setSelectedLanguage('st');
+            i18n.changeLanguage('st');
+          },
+        },
+        {
+          text: 'Setswana',
+          onPress: () => {
+            setSelectedLanguage('tn');
+            i18n.changeLanguage('tn');
+          },
+        },
+        {
+          text: 'siSwati',
+          onPress: () => {
+            setSelectedLanguage('ss');
+            i18n.changeLanguage('ss');
+          },
+        },
+        {
+          text: 'Tshivenda',
+          onPress: () => {
+            setSelectedLanguage('ve');
+            i18n.changeLanguage('ve');
+          },
+        },
+        {
+          text: 'itsonga',
+          onPress: () => {
+            setSelectedLanguage('ts');
+            i18n.changeLanguage('ts');
+          },
+        },
+        {
+          text: 'isiNdebele',
+          onPress: () => {
+            setSelectedLanguage('nr');
+            i18n.changeLanguage('nr');
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]);
+    }}
+  >
+    <View style={[styles.rowIcon, { backgroundColor: '#D6F0F4' }]}>
+      <MaterialCommunityIcons name="translate" size={20} color={TEAL} />
+    </View>
+
+    <View style={styles.rowBody}>
+      <Text style={styles.rowLabel}>Language</Text>
+      <Text style={styles.rowHint}>
+        {selectedLanguage === 'en' ? 'English' : selectedLanguage}
+      </Text>
+    </View>
+
+    <MaterialCommunityIcons
+      name="chevron-right"
+      size={20}
+      color={TEXT_MUTED}
+    />
+  </TouchableOpacity>
+</View>
+
+
+        <Text style={styles.sectionTitle}>{t('account')}</Text>
         <View style={styles.card}>
           <TouchableOpacity
             style={styles.row}

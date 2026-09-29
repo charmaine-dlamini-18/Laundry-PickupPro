@@ -4,6 +4,7 @@ import {
   FlatList,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -29,6 +30,7 @@ import {
   saveAddress,
   type SavedAddress,
 } from '../../services/addressService';
+import { searchAddresses, type AddressSuggestion } from '../../services/addressSearchService';
 
 type Props = NativeStackScreenProps<CustomerStackParamList, 'Addresses'>;
 
@@ -69,6 +71,9 @@ export default function AdressesScreen({ navigation }: Props) {
   const [makeDefault, setMakeDefault] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SavedAddress | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [searchingAddresses, setSearchingAddresses] = useState(false);
+  
 
   useEffect(() => {
     let active = true;
@@ -123,6 +128,33 @@ export default function AdressesScreen({ navigation }: Props) {
     }
     setDeleteTarget(null);
   };
+
+  const handleAddressSearch = async (text: string) => {
+  setAddress(text);
+
+  if (text.trim().length < 3) {
+    setAddressSuggestions([]);
+    return;
+  }
+
+  setSearchingAddresses(true);
+
+  try {
+    const results = await searchAddresses(text);
+    setAddressSuggestions(results);
+  } catch {
+    setAddressSuggestions([]);
+  } finally {
+    setSearchingAddresses(false);
+  }
+};
+
+const handleSelectAddress = (item: AddressSuggestion) => {
+  setAddress(item.formatted);
+  setAddressSuggestions([]);
+};
+
+
 
   const handleSave = async () => {
     const trimmedLabel = label.trim();
@@ -283,8 +315,13 @@ export default function AdressesScreen({ navigation }: Props) {
         onRequestClose={() => setShowModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
+  <View style={styles.modalCard}>
+    <ScrollView
+      contentContainerStyle={styles.modalScrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.modalTitle}>
               {editing ? 'Edit Address' : 'Add Address'}
             </Text>
 
@@ -292,11 +329,11 @@ export default function AdressesScreen({ navigation }: Props) {
             <View style={styles.inputField}>
               <MaterialCommunityIcons name="tag-outline" size={18} color={TEXT_MUTED} />
               <TextInput
-                style={styles.input}
+              style={styles.input}
                 value={label}
                 onChangeText={setLabel}
-                placeholder="Home, Work…"
-                placeholderTextColor={TEXT_MUTED}
+              placeholder="Home, Work…"
+              placeholderTextColor={TEXT_MUTED}
               />
             </View>
 
@@ -306,23 +343,55 @@ export default function AdressesScreen({ navigation }: Props) {
               <TextInput
                 style={styles.input}
                 value={address}
-                onChangeText={setAddress}
+                onChangeText={handleAddressSearch}
                 placeholder="Street, Suburb, City"
                 placeholderTextColor={TEXT_MUTED}
               />
             </View>
+{searchingAddresses && (
+  <View style={styles.addressSuggestionsBox}>
+    <Text style={styles.addressSearchingText}>
+      Searching addresses...
+    </Text>
+  </View>
+)}
 
+{!searchingAddresses && addressSuggestions.length > 0 && (
+  <View style={styles.addressSuggestionsBox}>
+    {addressSuggestions.map((item) => (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.addressSuggestionItem}
+        activeOpacity={0.8}
+        onPress={() => handleSelectAddress(item)}
+      >
+        <View style={styles.addressSuggestionIcon}>
+          <MaterialCommunityIcons
+            name="map-marker-outline"
+            size={18}
+            color={BLUE}
+          />
+        </View>
+
+        <Text style={styles.addressSuggestionText}>
+          {item.formatted}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
             <TouchableOpacity
-              style={styles.defaultRow}
-              onPress={() => setMakeDefault(!makeDefault)}
-            >
-              <View style={[styles.checkbox, makeDefault && styles.checkboxChecked]}>
-                {makeDefault && (
-                  <MaterialCommunityIcons name="check" size={13} color={WHITE} />
-                )}
-              </View>
-              <Text style={styles.defaultRowText}>Use as default address</Text>
-            </TouchableOpacity>
+  style={styles.defaultRow}
+  onPress={() => setMakeDefault(!makeDefault)}
+>
+  <View style={[styles.checkbox, makeDefault && styles.checkboxChecked]}>
+    {makeDefault && (
+      <MaterialCommunityIcons name="check" size={13} color={WHITE} />
+    )}
+  </View>
+
+  <Text style={styles.defaultRowText}>Use as default address</Text>
+</TouchableOpacity>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -344,10 +413,11 @@ export default function AdressesScreen({ navigation }: Props) {
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
-            </View>
-          </View>
+                        </View>
+          </ScrollView>
         </View>
-      </Modal>
+      </View>
+    </Modal>
 
       <Modal
         visible={deleteTarget !== null}
@@ -599,11 +669,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   modalCard: {
-    backgroundColor: WHITE,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 22,
-  },
+  backgroundColor: WHITE,
+  borderRadius: 20,
+  maxHeight: '90%',
+  overflow: 'hidden',
+},
+modalScrollContent: {
+  paddingHorizontal: 20,
+  paddingVertical: 22,
+},
   modalTitle: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 18,
@@ -814,4 +888,49 @@ const styles = StyleSheet.create({
     color: WHITE,
     marginLeft: 6,
   },
+
+  addressSuggestionsBox: {
+  backgroundColor: WHITE,
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 14,
+  marginTop: -4,
+  marginBottom: 10,
+  overflow: 'hidden',
+},
+
+addressSearchingText: {
+  fontFamily: 'Poppins_400Regular',
+  fontSize: 12,
+  color: TEXT_MUTED,
+  padding: 12,
+},
+
+addressSuggestionItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: BORDER,
+},
+
+addressSuggestionIcon: {
+  width: 34,
+  height: 34,
+  borderRadius: 10,
+  backgroundColor: BLUE_TINT,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 10,
+},
+
+addressSuggestionText: {
+  flex: 1,
+  fontFamily: 'Poppins_400Regular',
+  fontSize: 12,
+  color: TEXT_DARK,
+  lineHeight: 18,
+},
+
 });
