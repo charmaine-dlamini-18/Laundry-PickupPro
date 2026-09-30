@@ -11,8 +11,8 @@ export const supabase = createClient(
   supabaseUrl,
   supabaseKey
 );
+
 export async function testSupabaseConnection() {
   const { data, error } = await supabase.auth.getSession();
-
   console.log('Supabase connection:', { data, error });
 }

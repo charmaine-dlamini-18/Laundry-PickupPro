@@ -54,7 +54,6 @@ export function NotificationsProvider({
   const recipientName = '';
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     try {
       const records = await fetchNotifications('customer', '');
       setNotifications(records);
@@ -70,6 +69,16 @@ export function NotificationsProvider({
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refresh();
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [refresh]);
+
   const pushNotification = useCallback(async (input: NewNotification) => {
     const record = await createNotification(input);
     setNotifications((prev) => [record, ...prev]);
@@ -79,22 +88,23 @@ export function NotificationsProvider({
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))
     );
+
     try {
       await markNotificationRead(id);
     } catch {
-      // keep optimistic state; next refresh will reconcile
     }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
     if (!audience) return;
+
     setNotifications((prev) =>
       prev.map((item) => ({ ...item, read: true }))
     );
+
     try {
       await markAllNotificationsRead(audience, recipientName);
     } catch {
-      // keep optimistic state; next refresh will reconcile
     }
   }, [audience, recipientName]);
 
@@ -133,10 +143,12 @@ export function NotificationsProvider({
 
 export function useNotifications(): NotificationsContextValue {
   const context = useContext(NotificationsContext);
+
   if (context === undefined) {
     throw new Error(
       'useNotifications must be used within a NotificationsProvider'
     );
   }
+
   return context;
 }

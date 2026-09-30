@@ -88,6 +88,22 @@ export async function listAdminCustomers(): Promise<AdminCustomerRow[]> {
   return (data ?? []) as AdminCustomerRow[];
 }
 
+export async function deleteAdminCustomer(
+  customerId: string
+): Promise<void> {
+  console.log('DELETE CUSTOMER START:', customerId);
+
+  const { data, error } = await supabase.rpc('admin_delete_customer', {
+    p_customer_id: customerId,
+  });
+
+  console.log('DELETE CUSTOMER RESULT:', { data, error });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function listAdminDrivers(): Promise<AdminDriverRow[]> {
   const { data, error } = await supabase.rpc('admin_list_drivers');
 
@@ -170,15 +186,25 @@ function splitWindow(
   win?: string | null
 ): { date: string; time: string } {
   if (!win) return { date: '', time: '' };
+
   const [date, ...rest] = win.split(' · ');
-  return { date: date ?? '', time: rest.join(' · ') };
+
+  return {
+    date: date ?? '',
+    time: rest.join(' · '),
+  };
 }
 
 function legsToAdminOrder(legs: DriverOrderRow[]): AdminOrder {
   const pickup = legs.find((l) => l.type === 'Pickup') ?? legs[0];
   const delivery = legs.find((l) => l.type === 'Delivery');
+
   const created =
-    pickup?.created_at ?? delivery?.created_at ?? legs[0]?.created_at ?? '';
+    pickup?.created_at ??
+    delivery?.created_at ??
+    legs[0]?.created_at ??
+    '';
+
   const placedAt = created
     ? new Date(created).toLocaleString('en-US', {
         weekday: 'short',
@@ -188,30 +214,58 @@ function legsToAdminOrder(legs: DriverOrderRow[]): AdminOrder {
         minute: '2-digit',
       })
     : '';
+
   const driverName =
-    pickup?.assigned_driver_name || delivery?.assigned_driver_name || '';
+    pickup?.assigned_driver_name ||
+    delivery?.assigned_driver_name ||
+    '';
+
   const allCompleted =
-    legs.length > 0 && legs.every((l) => l.status === 'Completed');
+    legs.length > 0 &&
+    legs.every((l) => l.status === 'Completed');
+
   const status: AdminOrderStatus = allCompleted
     ? 'Completed'
     : driverName
       ? 'In Progress'
       : 'Pending';
+
   const pickupWin = splitWindow(pickup?.time);
   const deliveryWin = splitWindow(delivery?.time);
-  const bagCount = pickup?.bag_count ?? delivery?.bag_count ?? 0;
-  const total = Number(pickup?.total ?? delivery?.total ?? 0);
-  const rawPayment = pickup?.payment_method || delivery?.payment_method || 'Card';
+
+  const bagCount =
+    pickup?.bag_count ??
+    delivery?.bag_count ??
+    0;
+
+  const total = Number(
+    pickup?.total ??
+    delivery?.total ??
+    0
+  );
+
+  const rawPayment =
+    pickup?.payment_method ||
+    delivery?.payment_method ||
+    'Card';
+
   const paymentMethod: PaymentMethod =
-    rawPayment === 'EFT' || rawPayment === 'Cash' || rawPayment === 'Card'
+    rawPayment === 'EFT' ||
+    rawPayment === 'Cash' ||
+    rawPayment === 'Card'
       ? rawPayment
       : 'Card';
-  const reference = pickup?.booking_reference ?? '';
+
+  const reference =
+    pickup?.booking_reference ?? '';
+
   const items =
     bagCount > 0
       ? [
           {
-            name: `${bagCount} ${bagCount === 1 ? 'Bag' : 'Bags'}`,
+            name: `${bagCount} ${
+              bagCount === 1 ? 'Bag' : 'Bags'
+            }`,
             quantity: 1,
             price: total,
           },
@@ -219,14 +273,29 @@ function legsToAdminOrder(legs: DriverOrderRow[]): AdminOrder {
       : [];
 
   return {
-    id: reference ? `ord-${reference}` : pickup.id,
-    customerName: pickup?.customer_name ?? delivery?.customer_name ?? '',
-    customerPhone: pickup?.customer_phone ?? delivery?.customer_phone ?? '',
-    pickupAddress: pickup?.address ?? '',
+    id: reference
+      ? `ord-${reference}`
+      : pickup.id,
+    customerName:
+      pickup?.customer_name ??
+      delivery?.customer_name ??
+      '',
+    customerPhone:
+      pickup?.customer_phone ??
+      delivery?.customer_phone ??
+      '',
+    pickupAddress:
+      pickup?.address ?? '',
     deliveryAddress:
-      delivery?.address ?? pickup?.laundromat_address ?? '',
+      delivery?.address ??
+      pickup?.laundromat_address ??
+      '',
     pickupDate: pickupWin.date,
-    pickupTime: pickupWin.time || pickup?.time || deliveryWin.time || '',
+    pickupTime:
+      pickupWin.time ||
+      pickup?.time ||
+      deliveryWin.time ||
+      '',
     driver: driverName,
     driverPhone: '',
     status,
@@ -235,33 +304,58 @@ function legsToAdminOrder(legs: DriverOrderRow[]): AdminOrder {
     items,
     deliveryFee: 0,
     paymentMethod,
-    instructions: pickup?.notes ?? '',
-    laundromat: pickup?.laundromat ?? undefined,
-    laundromatAddress: pickup?.laundromat_address ?? undefined,
-    bookingReference: reference || undefined,
+    instructions:
+      pickup?.notes ?? '',
+    laundromat:
+      pickup?.laundromat ??
+      undefined,
+    laundromatAddress:
+      pickup?.laundromat_address ??
+      undefined,
+    bookingReference:
+      reference || undefined,
   };
 }
 
-export function rowsToAdminOrders(rows: DriverOrderRow[]): AdminOrder[] {
-  const groups = new Map<string, DriverOrderRow[]>();
+export function rowsToAdminOrders(
+  rows: DriverOrderRow[]
+): AdminOrder[] {
+  const groups = new Map<
+    string,
+    DriverOrderRow[]
+  >();
+
   const singles: DriverOrderRow[] = [];
 
   for (const row of rows) {
     if (row.booking_reference) {
-      const list = groups.get(row.booking_reference) ?? [];
+      const list =
+        groups.get(row.booking_reference) ??
+        [];
+
       list.push(row);
-      groups.set(row.booking_reference, list);
+
+      groups.set(
+        row.booking_reference,
+        list
+      );
     } else {
       singles.push(row);
     }
   }
 
   const orders: AdminOrder[] = [];
+
   for (const legs of groups.values()) {
-    orders.push(legsToAdminOrder(legs));
+    orders.push(
+      legsToAdminOrder(legs)
+    );
   }
+
   for (const row of singles) {
-    orders.push(legsToAdminOrder([row]));
+    orders.push(
+      legsToAdminOrder([row])
+    );
   }
 
   return orders;

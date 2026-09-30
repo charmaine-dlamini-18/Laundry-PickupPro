@@ -1,19 +1,80 @@
 import type { Role, User } from '../types';
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 function getRedirectTo(): string | undefined {
   const fromEnv = process.env.EXPO_PUBLIC_APP_URL;
+
   if (fromEnv) {
     return fromEnv;
   }
 
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+  if (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    window.location?.origin
+  ) {
     return window.location.origin;
   }
 
   return undefined;
 }
+
+function getOAuthRedirectTo(): string {
+  return AuthSession.makeRedirectUri({
+    scheme: 'laundrypickuppro',
+    path: 'auth/callback',
+  });
+}
+
+export async function signInWithGoogle(): Promise<void> {
+  const redirectTo = getOAuthRedirectTo();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.url) {
+    throw new Error('Google sign-in could not be started.');
+  }
+
+  const result = await WebBrowser.openAuthSessionAsync(
+    data.url,
+    redirectTo
+  );
+
+  if (result.type !== 'success') {
+    throw new Error('Google sign-in was cancelled.');
+  }
+
+  const url = result.url;
+  const params = new URL(url).searchParams;
+  const code = params.get('code');
+
+  if (!code) {
+    throw new Error('Google sign-in did not return an authentication code.');
+  }
+
+  const { error: exchangeError } =
+    await supabase.auth.exchangeCodeForSession(code);
+
+  if (exchangeError) {
+    throw new Error(exchangeError.message);
+  }
+}
+
 
 type LoginInput = {
   role: Role;
@@ -99,6 +160,7 @@ export async function register({
         phone: phone.trim(),
       },
       emailRedirectTo: getRedirectTo(),
+      
     },
   });
 
@@ -138,8 +200,13 @@ export async function forgotPassword(email: string): Promise<void> {
     throw new Error('Please enter your email address.');
   }
 
+  const redirectTo = AuthSession.makeRedirectUri({
+    scheme: 'laundrypickuppro',
+    path: 'reset-password',
+  });
+
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: getRedirectTo(),
+    redirectTo,
   });
 
   if (error) {

@@ -1,11 +1,10 @@
 import React from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import Logo from '../../components/Logo';
+
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
 import type { Role } from '../../types';
 import { colors } from '../../theme/colors';
@@ -82,7 +81,11 @@ export default function RoleSelectionScreen({ navigation }: Props) {
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textStrong} />
           </TouchableOpacity>
 
-          <Logo size="md" style={styles.logo} />
+          <Image
+  source={require('../../../assets/logo-purple.png')}
+  style={styles.logo}
+  resizeMode="contain"
+/>
 
           <View style={styles.header}>
             <Text style={styles.title}>Get started</Text>
@@ -205,9 +208,11 @@ const styles = StyleSheet.create({
     right: -70,
   },
   logo: {
-    alignSelf: 'center',
-    marginBottom: 4,
-  },
+  width: 116,
+  height: 116,
+  alignSelf: 'center',
+  marginBottom: 4,
+},
   backButton: {
     width: 44,
     height: 44,

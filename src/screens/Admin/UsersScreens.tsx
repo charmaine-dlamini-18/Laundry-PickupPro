@@ -382,19 +382,34 @@ export default function UsersScreen({ navigation }: Props) {
     }
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedCustomer) {
-      deleteCustomer(selectedCustomer.id);
-    }
+  const handleConfirmDelete = async () => {
+  if (!selectedCustomer) return;
+
+  try {
+    await deleteCustomer(selectedCustomer.id);
+
     setDeleteVisible(false);
     setDetailVisible(false);
     setSelectedCustomer(null);
+
     setSuccess({
       visible: true,
       title: 'Customer removed',
       message: 'The customer has been deleted.',
     });
-  };
+  } catch (error) {
+    setDeleteVisible(false);
+
+    setSuccess({
+      visible: true,
+      title: 'Delete failed',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'The customer could not be deleted.',
+    });
+  }
+};
 
   const renderCustomer = ({ item }: { item: AdminCustomer }) => (
     <TouchableOpacity

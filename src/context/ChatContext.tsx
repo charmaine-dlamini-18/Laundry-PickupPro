@@ -74,9 +74,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           [orderId]: [...(prev[orderId] ?? []), record],
         }));
-      } catch {
-        // Message could not be persisted; drop silently to keep UI responsive.
-      }
+      } catch (error) {
+  console.error('CHAT SEND ERROR:', error);
+}
     },
     []
   );

@@ -360,33 +360,34 @@ export default function AuthScreen({ navigation, route }: Props) {
               style={styles.submitButton}
             />
 
-            <View style={styles.socialSection}>
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or continue with</Text>
-                <View style={styles.dividerLine} />
-              </View>
+{role === 'customer' && (
+  <View style={styles.socialSection}>
+    <View style={styles.dividerRow}>
+      <View style={styles.dividerLine} />
+      <Text style={styles.dividerText}>or continue with</Text>
+      <View style={styles.dividerLine} />
+    </View>
 
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() =>
-                  Alert.alert('Google', 'Sign in with Google coming soon.')
-                }
-              >
-                <MaterialCommunityIcons name="google" size={20} color="#DB4437" />
-                <Text style={styles.socialText}>Continue with Google</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() =>
-                  Alert.alert('Apple', 'Sign in with Apple coming soon.')
-                }
-              >
-                <MaterialCommunityIcons name="apple" size={20} color="#171717" />
-                <Text style={styles.socialText}>Continue with Apple</Text>
-              </TouchableOpacity>
-            </View>
+    <TouchableOpacity
+      style={styles.socialButton}
+      onPress={async () => {
+        try {
+          setLoginError('');
+          await AuthServices.signInWithGoogle();
+        } catch (error) {
+          setLoginError(
+            error instanceof Error
+              ? error.message
+              : 'Google sign-in failed.'
+          );
+        }
+      }}
+    >
+      <MaterialCommunityIcons name="google" size={20} color="#DB4437" />
+      <Text style={styles.socialText}>Continue with Google</Text>
+    </TouchableOpacity>
+  </View>
+)}
           </View>
         ) : regSuccessEmail ? (
           <View style={styles.successCard}>
